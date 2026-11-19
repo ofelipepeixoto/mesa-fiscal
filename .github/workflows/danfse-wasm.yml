@@ -1,0 +1,60 @@
+name: Compilar gerador de DANFSe para o navegador
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  compilar:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Obter a revisão oficial
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: ReceitaFederal/calculadora-rtc-gerador-danfse
+          ref: 8d79e6b2f7fad6375340afcb51c85ed370c64a14
+          persist-credentials: false
+
+      - name: Preparar Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version: '1.27.1'
+          cache: false
+
+      - name: Compilar e reunir as licenças
+        env:
+          GOOS: js
+          GOARCH: wasm
+          CGO_ENABLED: '0'
+          GOTOOLCHAIN: local
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/engine"
+          mkdir -p "$out"
+          go build -mod=readonly -trimpath -buildvcs=false -ldflags='-s -w' -o "$out/danfse.wasm" ./cmd/danfse-wasm
+          go mod verify
+          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" "$out/"
+          cp "$(go env GOROOT)/LICENSE" "$out/LICENSE-Go.txt"
+          cp LICENSE "$out/LICENSE-DANFSe.txt"
+          go list -deps -mod=readonly -f '{{with .Module}}{{.Path}}|{{.Dir}}{{end}}' ./cmd/danfse-wasm | sort -u > "$RUNNER_TEMP/modules"
+          while IFS='|' read -r mod dir; do
+            if [ -z "$dir" ] || [ "$mod" = "danfse-service" ]; then continue; fi
+            printf '\n============ %s ============\n' "$mod"
+            find "$dir" -maxdepth 2 -type f \( -iname 'license*' -o -iname 'notice*' -o -iname 'copying*' \) -print0 | sort -z | xargs -0 -r cat
+          done < "$RUNNER_TEMP/modules" > "$out/THIRD-PARTY.txt"
+          go version -m "$out/danfse.wasm" > "$out/BUILD.txt"
+          printf 'Fonte: https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse/commit/%s\n' "$(git rev-parse HEAD)" >> "$out/BUILD.txt"
+          cd "$out"
+          sha256sum BUILD.txt LICENSE-*.txt THIRD-PARTY.txt danfse.wasm wasm_exec.js > SHA256SUMS
+          sha256sum -c SHA256SUMS
+
+      - name: Disponibilizar o motor
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: motor-danfse-browser
+          path: ${{ runner.temp }}/engine/
+          if-no-files-found: error
+          retention-days: 7
