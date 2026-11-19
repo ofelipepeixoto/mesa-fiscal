@@ -15,6 +15,10 @@ on:
       - 'public/regular-study.mjs'
       - 'public/simples-study.mjs'
       - 'public/exemplo-nfse.xml'
+      - 'public/danfse-*'
+      - 'public/flows.mjs'
+      - 'public/engine/**'
+      - 'scripts/testar-danfse-navegador.mjs'
 
 permissions:
   contents: read
@@ -24,6 +28,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  navegador:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Obter a revisão em teste
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Gerar o PDF no Chrome sem enviar o XML
+        run: |
+          chromedriver --port=9515 > "$RUNNER_TEMP/chromedriver.log" 2>&1 &
+          trap 'kill "$!" 2>/dev/null || true' EXIT
+          curl --fail --silent --retry 15 --retry-connrefused --retry-delay 1 http://127.0.0.1:9515/status > /dev/null
+          node scripts/testar-danfse-navegador.mjs
   motores:
     runs-on: ubuntu-24.04
     timeout-minutes: 40

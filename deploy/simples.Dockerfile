@@ -7,7 +7,7 @@ COPY --from=catalog /flyway ./flyway
 RUN mkdir -p calculadora/db \
     && mvn -B -ntp flyway:migrate -Dflyway.configFiles=./flyway/flyway-pro.conf \
     && test -s calculadora/db/calculadora-pro.db \
-    && mvn -B -ntp -Dtest=SimplesNacionalControllerTest package
+    && APPLICATION_DB_DOWNLOAD_URL="" mvn -B -ntp -Dtest=SimplesNacionalControllerTest package
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app

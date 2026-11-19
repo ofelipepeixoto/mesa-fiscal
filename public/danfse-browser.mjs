@@ -6,7 +6,7 @@ export async function browserDanfseAvailable() {
     const files = ["engine/danfse.wasm.gz", "engine/wasm_exec.js"];
     const responses = await Promise.all(files.map(path =>
       fetch(new URL(path, import.meta.url), {
-        method: "HEAD", credentials: "omit", redirect: "error", signal: AbortSignal.timeout(3500),
+        method: "HEAD", credentials: "same-origin", redirect: "error", signal: AbortSignal.timeout(3500),
       }),
     ));
     return responses.every(response => response.ok && !response.headers.get("content-type")?.includes("text/html"));

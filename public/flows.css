@@ -39,3 +39,4 @@
 .fiscal-flow :is(button,a,summary,input,select):focus-visible {outline:3px solid #26634d; outline-offset:3px;}
 .fiscal-flow .action-row {display:flex;flex-wrap:wrap;align-items:center;gap:.55rem;}
 @media(max-width:560px){.flow-fields{grid-template-columns:1fr;}.flow-results {grid-template-columns:1fr 1fr;}.flow-result .result-card {padding:.7rem;}.flow-mode{font-size:.82rem;padding:.6rem .65rem;}}
+.flow-comparison {background:#eaf3ed; color:#244b36; padding:.75rem 1rem; border-radius:.5rem; font-size:.92rem; line-height:1.5; }

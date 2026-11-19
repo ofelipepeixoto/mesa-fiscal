@@ -45,6 +45,9 @@ function amountInput(label, value, unit = 'R$', hint) {
   input.value = String(value).replace('.', ',');
   input.pattern = unit === '%' ? '[0-9]{1,3}([,.][0-9]{1,4})?' : '([0-9]+|[0-9]{1,3}([.][0-9]{3})+)(,[0-9]{1,2})?|[0-9]+[.][0-9]{1,2}';
   input.title = unit === '%' ? 'Use um percentual entre 0 e 100, com até quatro casas decimais.' : 'Use um valor em reais, como 1.250,00.';
+  if (unit === '%') input.addEventListener('input', () => {
+    input.setCustomValidity(Number(input.value.replace(',', '.')) > 100 ? 'Use um percentual entre 0 e 100.' : '');
+  });
   const field = make('div', 'field flow-field');
   const caption = make('label', '', label);
   const group = pack(make('div', 'flow-input-unit'), make('span', '', unit), input);
@@ -173,7 +176,19 @@ function resultOrigin(result, official) {
   if (!official) return 'Projeção de exemplo';
   return result.status === 'simulado' ? 'Simulação do motor da Receita' : 'Calculado pelo motor da Receita';
 }
-function presentResult(result, host, official, kind) {
+function differenceText(total, original) {
+  const inCents = value => {
+    const [whole, fraction = ''] = value.split('.');
+    return BigInt(whole) * 100n + BigInt(fraction.padEnd(2,'0'));
+  };
+  const difference = inCents(total) - inCents(original);
+  const starting = currency(original);
+  if (difference === 0n) return 'O total continua em ' + starting + ', igual ao exemplo original.';
+  const magnitude = difference < 0n ? -difference : difference;
+  const amount = currency(String(magnitude / 100n) + '.' + String(magnitude % 100n).padStart(2,'0'));
+  return 'O total ' + (difference > 0n ? 'subiu ' : 'caiu ') + amount + ' em relação ao exemplo original de ' + starting + '.';
+}
+function presentResult(result, host, official, kind, originalTotal) {
   const amounts = [result?.total, result?.cbs, result?.ibs];
   if (result?.is != null) amounts.push(result.is);
   if (amounts.some(value => !/^\d{1,20}(?:\.\d{1,2})?$/.test(String(value)))) throw new Error('A resposta veio incompleta. Confira se o serviço está atualizado e tente novamente.');
@@ -184,7 +199,7 @@ function presentResult(result, host, official, kind) {
   grid.append(card('Total dos tributos do item', currency(result.total), true), card('CBS · contribuição federal', currency(result.cbs)), card('IBS · imposto estadual e municipal', currency(result.ibs)));
   if (result.is != null) grid.append(card('IS · imposto seletivo', currency(result.is)));
   content.append(title, grid);
-  if (kind === 'simples') content.append(description('Este total se refere aos tributos do item. O valor mensal do DAS é apurado em outro processo.'));
+  if (originalTotal !== undefined) content.append(make('p','flow-comparison',differenceText(result.total, originalTotal)));
   const info = Array.isArray(result.memoria) ? result.memoria.filter(s => typeof s === 'string') : [];
   if (info.length) content.append(disclosure('Entender o cálculo', ...info.map(description)));
   host.replaceChildren(content);
@@ -231,7 +246,12 @@ function renderCalculator(kind, host, opts) {
     form.append(blockTitle(title));
     const lead = isOfficial ? 'Os campos começam com os dados de um exemplo. Confira e substitua os dados antes de calcular.' : scenarioText(kind);
     form.append(description(lead));
-    if (!isOfficial && !canCall) form.append(make('p','flow-status','O motor da Receita está desconectado. O exemplo funciona neste navegador.'));
+    if (kind === 'simples') form.append(description('Esta simulação calcula os tributos de um item. A apuração do DAS mensal é feita à parte.'));
+    if (!isOfficial && !canCall) {
+      const online = document.querySelector('meta[name="mesa-edicao"]')?.content === 'navegador';
+      const availability = online ? 'Na versão online, você pode explorar este exemplo. Outras operações estão disponíveis na instalação local.' : 'O motor da Receita está desconectado. O exemplo funciona neste navegador.';
+      form.append(make('p','flow-status',availability));
+    }
     const original = kind === 'regular' ? regularExample.source : 'https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional/blob/c5b0f01c8351c3f0d0795cc617b29d233e9f98df/src/test/java/br/gov/serpro/rtc/testesintegracao/simplesnacional/SimplesNacionalControllerTest.java#L41-L97';
     let codes;
     if (isOfficial) {
@@ -245,7 +265,7 @@ function renderCalculator(kind, host, opts) {
       const exact = kind === 'regular' ? 'NBS 122011200 · CST 200 · cClassTrib 200028 · Município IBGE 4314902.' : 'NF-e modelo 55 · Venda ou revenda de mercadoria (atividade 01) · cClassTrib 000001 · Regime CRT 1.';
       form.append(disclosure('Ver os dados fixos do exemplo',description(exact), source));
     }
-    const base = amountInput('Base de cálculo',defaults.base,'R$',kind === 'regular' ? 'Valor da operação usado para calcular os tributos.' : 'Use o valor sobre o qual os percentuais serão aplicados.');
+    const base = amountInput(isOfficial ? 'Base de cálculo' : 'Valor usado no cálculo',defaults.base,'R$',isOfficial ? 'Use o valor sobre o qual os percentuais serão aplicados.' : 'Você pode trocar este valor para ver como o total dos tributos muda.');
     const entries = kind === 'regular' ? {
       cbs:amountInput('Alíquota da CBS',defaults.rates.cbs,'%'),
       ibsEstadual:amountInput('Alíquota estadual do IBS',defaults.rates.ibsEstadual,'%'),
@@ -257,7 +277,12 @@ function renderCalculator(kind, host, opts) {
     };
     form.append(fields(base));
     const rateFields = fields(...Object.values(entries));
-    form.append(rateFields);
+    if (isOfficial) form.append(rateFields);
+    else form.append(disclosure('Ajustar alíquotas e impostos do exemplo',rateFields),description('Os percentuais e impostos do exemplo já estão preenchidos.'));
+    form.addEventListener('invalid', event => {
+      const details = event.target.closest('details');
+      if (details) details.open = true;
+    },true);
     const regularRatesApply = () => !isOfficial || kind !== 'regular' || codes.date.read() >= '2027-01-01';
     if (isOfficial && kind === 'regular') {
       const toggle = () => {
@@ -295,7 +320,15 @@ function renderCalculator(kind, host, opts) {
           const json = await response.json(); result = json.result ?? json;
         } else { result = kind === 'regular' ? projectEducation(inputs) : estimateSimples(inputs); }
         if (currentRevision !== revision || !form.isConnected) return;
-        presentResult(result, output, isOfficial, kind);
+        let originalTotal;
+        if (!isOfficial) {
+          const normalized = value => String(value).replace(/^0+(?=\d)/,'').replace(/(\.\d*?)0+$/,'$1').replace(/\.$/,'');
+          const originalEntries = kind === 'regular' ? defaults.rates : defaults;
+          const edited = normalized(inputs.base) !== normalized(defaults.base) ||
+            Object.entries(entries).some(([key,entry]) => normalized(entry.read()) !== normalized(originalEntries[key]));
+          if (edited) originalTotal = kind === 'regular' ? regularExample.result.total : simplesExample.result.total;
+        }
+        presentResult(result, output, isOfficial, kind, originalTotal);
         opts.onComplete?.({kind,title:labels[kind][0],value:currency(result.total),detail:resultOrigin(result,isOfficial)});
       } catch (err) {
         if (form.isConnected && currentRevision === revision) showError(error, err.message);

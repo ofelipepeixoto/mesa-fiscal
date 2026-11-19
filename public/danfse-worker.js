@@ -3,7 +3,7 @@ self.onmessage = async ({data}) => {
   try {
     importScripts("./engine/wasm_exec.js");
     const go = new Go();
-    const response = await fetch("./engine/danfse.wasm.gz", {credentials: "omit", redirect: "error"});
+    const response = await fetch("./engine/danfse.wasm.gz", {credentials: "same-origin", redirect: "error"});
     if (!response.ok) throw new Error();
     const bytes = new Uint8Array(await response.arrayBuffer());
     const compressed = bytes[0] === 0x1f && bytes[1] === 0x8b;
