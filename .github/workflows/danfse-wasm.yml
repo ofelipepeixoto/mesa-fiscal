@@ -1,6 +1,11 @@
 name: Compilar gerador de DANFSe para o navegador
 on:
   workflow_dispatch:
+    inputs:
+      registrar_binario:
+        description: Preparar o objeto Git do motor compactado para a publicação do Mesa Fiscal
+        type: boolean
+        default: false
   workflow_call:
 
 permissions:
@@ -49,7 +54,9 @@ jobs:
           go list -deps -mod=readonly -f '{{with .Module}}{{.Path}} {{.Version}}{{end}}' ./cmd/danfse-wasm | sort -u >> "$out/BUILD.txt"
           printf 'Fonte: https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse/commit/%s\n' "$(git rev-parse HEAD)" >> "$out/BUILD.txt"
           cd "$out"
-          sha256sum BUILD.txt LICENSE-*.txt THIRD-PARTY.txt danfse.wasm wasm_exec.js > SHA256SUMS
+          sha256sum danfse.wasm >> BUILD.txt
+          gzip -9 -n danfse.wasm
+          sha256sum BUILD.txt LICENSE-*.txt THIRD-PARTY.txt danfse.wasm.gz wasm_exec.js > SHA256SUMS
           sha256sum -c SHA256SUMS
 
       - name: Disponibilizar o motor
@@ -59,3 +66,27 @@ jobs:
           path: ${{ runner.temp }}/engine/
           if-no-files-found: error
           retention-days: 7
+
+  registrar:
+    if: github.event_name == 'workflow_dispatch' && inputs.registrar_binario
+    needs: compilar
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Verificar o binário e preparar seu objeto Git
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name motor-danfse-browser --dir engine
+          cd engine
+          sha256sum -c SHA256SUMS
+          git init -q "$RUNNER_TEMP/hash"
+          expected=$(git -C "$RUNNER_TEMP/hash" hash-object --stdin < danfse.wasm.gz)
+          jq -Rs '{encoding:"base64",content:.}' < <(base64 -w 0 danfse.wasm.gz) > "$RUNNER_TEMP/blob.json"
+          sha=$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/blobs" --input "$RUNNER_TEMP/blob.json" --jq .sha)
+          test "$sha" = "$expected"
+          printf 'Objeto Git compactado: `%s`\n' "$sha" >> "$GITHUB_STEP_SUMMARY"
