@@ -45,7 +45,8 @@ jobs:
             printf '\n============ %s ============\n' "$mod"
             find "$dir" -maxdepth 2 -type f \( -iname 'license*' -o -iname 'notice*' -o -iname 'copying*' \) -print0 | sort -z | xargs -0 -r cat
           done < "$RUNNER_TEMP/modules" > "$out/THIRD-PARTY.txt"
-          go version -m "$out/danfse.wasm" > "$out/BUILD.txt"
+          go version > "$out/BUILD.txt"
+          go list -deps -mod=readonly -f '{{with .Module}}{{.Path}} {{.Version}}{{end}}' ./cmd/danfse-wasm | sort -u >> "$out/BUILD.txt"
           printf 'Fonte: https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse/commit/%s\n' "$(git rev-parse HEAD)" >> "$out/BUILD.txt"
           cd "$out"
           sha256sum BUILD.txt LICENSE-*.txt THIRD-PARTY.txt danfse.wasm wasm_exec.js > SHA256SUMS
