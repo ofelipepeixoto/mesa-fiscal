@@ -1,0 +1,53 @@
+name: Homologar os três motores oficiais
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/official-engines.yml'
+      - 'compose.yaml'
+      - 'Dockerfile'
+      - 'deploy/**'
+      - 'server/**'
+      - 'server.mjs'
+      - 'scripts/verify-engines.mjs'
+      - 'public/regular-study.mjs'
+      - 'public/simples-study.mjs'
+      - 'public/exemplo-nfse.xml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homologar-motores-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  motores:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Obter a revisão em teste
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Preparar o construtor
+        run: |
+          docker compose version
+          docker buildx create --name mesa-fiscal-ci --driver docker-container --use
+          docker buildx inspect --bootstrap
+      - name: Construir e iniciar os motores e a interface
+        env:
+          BUILDX_BUILDER: mesa-fiscal-ci
+        run: docker compose up -d --build
+      - name: Conferir resultados pela interface HTTP
+        run: node scripts/verify-engines.mjs
+      - name: Examinar serviços em caso de falha
+        if: failure()
+        run: |
+          docker compose ps -a
+          docker compose logs --no-color --tail 100
+      - name: Encerrar os serviços do teste
+        if: always()
+        run: docker compose down --volumes --remove-orphans

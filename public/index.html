@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#064c42"><meta name="description" content="Simule tributos sobre operações de consumo e prepare o PDF de uma NFS-e.">
+<title>Mesa Fiscal | Visão geral</title><link rel="icon" href="/marca.svg" type="image/svg+xml"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/flows.css"><script type="module" src="/app.mjs"></script>
+</head><body>
+<a class="skip" href="#conteudo">Ir para o conteúdo</a>
+<div class="shell">
+<aside class="sidebar" aria-label="Barra lateral">
+<a class="brand" href="#inicio" aria-label="Mesa Fiscal, início"><img src="/marca.svg" alt="" width="37" height="37"><span>Mesa<strong>Fiscal</strong></span></a>
+<nav aria-label="Navegação principal">
+<p class="nav-label">Área de trabalho</p>
+<a class="nav-item" href="#inicio" data-route="inicio"><i data-icon="layout"></i>Visão geral</a>
+<a class="nav-item" href="#historico" data-route="historico"><i data-icon="history"></i>Histórico da sessão</a>
+<p class="nav-label second">Ferramentas</p>
+<a class="nav-item" href="#regular" data-route="regular"><i data-icon="layers"></i>Regime regular</a>
+<a class="nav-item" href="#simples" data-route="simples"><i data-icon="store"></i>Simples Nacional</a>
+<a class="nav-item" href="#danfse" data-route="danfse"><i data-icon="file"></i>PDF da NFS-e</a>
+</nav><div class="side-bottom"><a class="nav-item" href="#ajuda" data-route="ajuda"><i data-icon="help"></i>Central de ajuda</a><div class="side-brand"><span class="side-monogram">MF</span><div><b>Mesa Fiscal</b><span>Espaço de trabalho</span></div></div></div>
+</aside>
+<div class="screen"><header class="topbar"><div class="breadcrumbs"><button id="menu" class="menu icon-button" aria-label="Abrir navegação" aria-expanded="false"><i data-icon="menu"></i></button><span class="desktop-label">Área de trabalho</span><span class="sep desktop-label">/</span><span id="crumb">Visão geral</span></div><div class="tools-top"><span class="date"><i data-icon="calendar"></i><span id="today"></span></span><a href="#ajuda" class="icon-button" aria-label="Ajuda"><i data-icon="help"></i></a></div></header>
+<main id="conteudo" tabindex="-1"><section id="route" aria-label="Área de trabalho"><h1>Visão geral</h1><p>Carregando ferramentas fiscais…</p></section></main>
+</div></div><button id="scrim" class="scrim" aria-label="Fechar navegação" hidden></button>
+<dialog id="chooser" aria-labelledby="chooser-title"><div class="dialog-head"><h2 id="chooser-title">Qual é o regime da operação?</h2><button class="icon-button" data-close aria-label="Fechar"><i data-icon="close"></i></button></div><p class="muted">Escolha o regime informado pela contabilidade da empresa.</p><div id="choices"></div><a class="text-link" data-close href="#ajuda">Preciso entender a diferença</a></dialog>
+</body></html>

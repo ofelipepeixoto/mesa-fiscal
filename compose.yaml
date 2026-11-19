@@ -1,0 +1,36 @@
+name: mesa-fiscal
+services:
+  app:
+    build:
+      context: .
+      dockerfile: deploy/app.Dockerfile
+    ports:
+      - "127.0.0.1:4173:4173"
+    environment:
+      REGULAR_URL: http://regular:8080/api/calculadora
+      SIMPLES_URL: http://simples:8082/api
+      DANFSE_URL: http://danfse:8080
+    depends_on: [regular, simples, danfse]
+    networks: [motores]
+  regular:
+    build:
+      context: .
+      dockerfile: deploy/regular.Dockerfile
+      additional_contexts:
+        upstream: https://github.com/ReceitaFederal/calculadora-rtc-regime-regular.git#150cccbe414d4a5edea703e4f7a424af5aa222c7
+    networks: [motores]
+  simples:
+    build:
+      context: .
+      dockerfile: deploy/simples.Dockerfile
+      additional_contexts:
+        upstream: https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional.git#c5b0f01c8351c3f0d0795cc617b29d233e9f98df
+        catalog: https://github.com/ReceitaFederal/calculadora-rtc-regime-regular.git#150cccbe414d4a5edea703e4f7a424af5aa222c7
+    networks: [motores]
+  danfse:
+    build: https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse.git#8d79e6b2f7fad6375340afcb51c85ed370c64a14
+    platform: linux/amd64
+    networks: [motores]
+networks:
+  motores:
+    driver: bridge

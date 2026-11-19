@@ -1,0 +1,14 @@
+{
+  "name": "mesa-fiscal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Simulações guiadas de tributos e PDF de NFS-e com os projetos RTC da Receita Federal.",
+  "engines": {"node": ">=22"},
+  "scripts": {
+    "start": "node server/start.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:engines": "node scripts/verify-engines.mjs"
+  }
+}

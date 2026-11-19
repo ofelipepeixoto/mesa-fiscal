@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NFSe xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.00">
+  <infNFSe Id="NFS00000000000000000000000000000000000000000000000000">
+    <xLocEmi>Rio de Janeiro</xLocEmi>
+    <xLocPrestacao>Rio de Janeiro</xLocPrestacao>
+    <nNFSe>1</nNFSe>
+    <cLocIncid>3304557</cLocIncid>
+    <xLocIncid>Rio de Janeiro</xLocIncid>
+    <ambGer>2</ambGer>
+    <cStat>100</cStat>
+    <dhProc>2026-11-19T10:00:00-03:00</dhProc>
+    <emit>
+      <CNPJ>00000000000000</CNPJ>
+      <xNome>Estúdio de Exemplo Fictício</xNome>
+      <enderNac><cMun>3304557</cMun><UF>RJ</UF></enderNac>
+    </emit>
+    <valores><vLiq>850.00</vLiq></valores>
+    <DPS versao="1.00">
+      <infDPS Id="DPS00000000000000000000000000000000000000000000">
+        <tpAmb>2</tpAmb>
+        <dhEmi>2026-11-19T10:00:00-03:00</dhEmi>
+        <serie>1</serie><nDPS>1</nDPS>
+        <dCompet>2026-11-19</dCompet>
+        <tpEmit>1</tpEmit><cLocEmi>3304557</cLocEmi>
+        <prest><regTrib><opSimpNac>1</opSimpNac></regTrib></prest>
+        <toma><xNome>Cliente de Exemplo</xNome></toma>
+        <serv>
+          <locPrest><cLocPrestacao>3304557</cLocPrestacao></locPrest>
+          <cServ>
+            <cTribNac>010101</cTribNac>
+            <xDescServ>EXEMPLO FICTÍCIO SEM VALOR FISCAL. Serviço de tecnologia para apresentação do sistema.</xDescServ>
+          </cServ>
+          <infoCompl><xInfComp>Documento didático sem emissão, assinatura ou autorização. Todos os dados são fictícios.</xInfComp></infoCompl>
+        </serv>
+        <valores>
+          <vServPrest><vServ>850.00</vServ></vServPrest>
+          <trib><tribMun><tribISSQN>1</tribISSQN><tpRetISSQN>1</tpRetISSQN></tribMun></trib>
+        </valores>
+      </infDPS>
+    </DPS>
+  </infNFSe>
+</NFSe>
