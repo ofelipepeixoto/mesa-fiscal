@@ -35,13 +35,23 @@ try {
     const ref = element["element-6066-11e4-a52e-4f735466cecf"];
     await command(session + "/element/" + ref + "/click", {});
   }
-  async function checkScreen(title) {
-    const dimensions = await command(session + "/execute/sync", {
-      args: [], script: "return [window.innerWidth, document.documentElement.scrollWidth, document.querySelector('h1')?.textContent.trim()];",
-    });
-    assert.deepEqual(dimensions, [390, 390, title], "Conteúdo da tela e largura sem rolagem lateral.");
+  async function checkScreen(hash, title) {
+    const state = await command(session + "/execute/async", {args: [hash, title], script: `
+      const [expectedHash, expectedTitle, done] = arguments;
+      const deadline = performance.now() + 6000;
+      function inspect() {
+        const title = document.querySelector('main h1')?.textContent.trim();
+        if ((location.hash === expectedHash && title === expectedTitle) || performance.now() >= deadline) {
+          done([location.hash, title, window.innerWidth, document.documentElement.scrollWidth]);
+        } else {
+          setTimeout(inspect, 50);
+        }
+      }
+      inspect();
+    `});
+    assert.deepEqual(state, [hash, title, 390, 390], "Rota, título e largura após a navegação.");
   }
-  await checkScreen("Visão geral");
+  await checkScreen("#inicio", "Visão geral");
   await click("#menu");
   await click(".sidebar [data-route=danfse]");
   const result = await command(session + "/execute/async", {args: [], script: `
@@ -71,10 +81,10 @@ try {
   assert.equal(result.error, undefined, result.error);
   assert.equal(result.prefix, "%PDF-");
   assert.ok(result.size > 1000 && result.local, "O PDF deve sair do motor local do navegador.");
-  await checkScreen("PDF da nota de serviço");
+  await checkScreen("#danfse", "PDF da nota de serviço");
   await click("#menu");
   await click(".sidebar [data-route=inicio]");
-  await checkScreen("Visão geral");
+  await checkScreen("#inicio", "Visão geral");
   assert.ok(requests.some(req => req.method === "GET" && req.path === "/engine/danfse.wasm.gz"));
   assert.ok(requests.some(req => req.method === "GET" && req.path === "/exemplo-nfse.xml"));
   assert.ok(requests.every(req => ["GET","HEAD"].includes(req.method)), "O navegador enviou dados ao servidor.");

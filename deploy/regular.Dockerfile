@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
 # "upstream" is the named build context fixed to the Receita Federal commit in compose.
-FROM eclipse-temurin:21-jdk AS build
+FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /src
 COPY --from=upstream / ./
 RUN mkdir -p calculadora/db \
-    && sh mvnw -B -ntp flyway:migrate -Dflyway.configFiles=./flyway/flyway-pro.conf \
-    && sh mvnw -B -ntp -DskipTests package \
+    && mvn -B -ntp flyway:migrate -Dflyway.configFiles=./flyway/flyway-pro.conf \
+    && mvn -B -ntp -DskipTests package \
     && test -s calculadora/db/calculadora-pro.db \
     && test -s target/api-regime-geral.jar
 
