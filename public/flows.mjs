@@ -42,7 +42,7 @@ function amountInput(label, value, unit = 'R$', hint) {
   input.required = true;
   input.autocomplete = 'off';
   input.maxLength = unit === '%' ? 10 : 22;
-  input.value = String(value).replace('.', ',');
+  input.value = String(value ?? '').replace('.', ',');
   input.pattern = unit === '%' ? '[0-9]{1,3}([,.][0-9]{1,4})?' : '([0-9]+|[0-9]{1,3}([.][0-9]{3})+)(,[0-9]{1,2})?|[0-9]+[.][0-9]{1,2}';
   input.title = unit === '%' ? 'Use um percentual entre 0 e 100, com até quatro casas decimais.' : 'Use um valor em reais, como 1.250,00.';
   if (unit === '%') input.addEventListener('input', () => {
@@ -76,6 +76,11 @@ function basicField(label, opts = {}) {
   input.required = true;
   input.id = 'fiscal-' + (++fieldId);
   if (options) {
+    if (value == null && !options.some(([optionValue]) => optionValue === '')) {
+      const prompt = make('option', '', 'Selecione uma opção');
+      prompt.value = '';
+      input.append(prompt);
+    }
     for (const [val, name] of options) {
       const option = make('option', '', name);
       option.value = val;
@@ -108,7 +113,7 @@ function codeFields(kind, defaults) {
     const classification = basicField('Código do produto ou serviço', {value: defaults.classification, digits: 9, pattern:'[0-9]{9}', hint:'Use o NCM do produto (8 dígitos) ou o NBS do serviço (9 dígitos).'});
     const update = () => { classification.control.pattern = type.read() === 'produto' ? '[0-9]{8}' : '[0-9]{9}'; };
     update();
-    type.control.addEventListener('change', update);
+    type.control.addEventListener('input', update);
     return {
       date: basicField('Data da operação', {type:'date',value:defaults.date}), uf: basicField('Estado da operação', {options:states.map(s => [s,s]),value:defaults.uf}),
       municipio: basicField('Código IBGE do município', {value:defaults.municipio, digits:7, pattern:'[0-9]{7}', hint:'Use os 7 dígitos do município onde o imposto é devido.'}), kind: type, classification,
@@ -244,7 +249,7 @@ function renderCalculator(kind, host, opts) {
     const form = make('form','panel flow-form');
     const title = isOfficial ? 'Dados da operação' : kind === 'regular' ? 'Simular um serviço de educação' : 'Simular uma venda de produto';
     form.append(blockTitle(title));
-    const lead = isOfficial ? 'Os campos começam com os dados de um exemplo. Confira e substitua os dados antes de calcular.' : scenarioText(kind);
+    const lead = isOfficial ? 'Preencha os campos com os dados da operação que você quer calcular.' : scenarioText(kind);
     form.append(description(lead));
     if (kind === 'simples') form.append(description('Esta simulação calcula os tributos de um item. A apuração do DAS mensal é feita à parte.'));
     if (!isOfficial && !canCall) {
@@ -253,9 +258,16 @@ function renderCalculator(kind, host, opts) {
       form.append(make('p','flow-status',availability));
     }
     const original = kind === 'regular' ? regularExample.source : 'https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional/blob/c5b0f01c8351c3f0d0795cc617b29d233e9f98df/src/test/java/br/gov/serpro/rtc/testesintegracao/simplesnacional/SimplesNacionalControllerTest.java#L41-L97';
+    const initial = isOfficial ? { rates: {} } : defaults;
     let codes;
+    let fillExample;
+    let exampleNotice;
     if (isOfficial) {
-      codes = codeFields(kind,defaults);
+      fillExample = button('Preencher com o exemplo');
+      exampleNotice = make('span','flow-status');
+      exampleNotice.setAttribute('role','status');
+      form.append(pack(make('div','action-row'),fillExample,exampleNotice));
+      codes = codeFields(kind,initial);
       form.append(fields(...Object.values(codes)));
       if (kind === 'simples') form.append(activityLookup(codes));
     } else {
@@ -265,15 +277,15 @@ function renderCalculator(kind, host, opts) {
       const exact = kind === 'regular' ? 'NBS 122011200 · CST 200 · cClassTrib 200028 · Município IBGE 4314902.' : 'NF-e modelo 55 · Venda ou revenda de mercadoria (atividade 01) · cClassTrib 000001 · Regime CRT 1.';
       form.append(disclosure('Ver os dados fixos do exemplo',description(exact), source));
     }
-    const base = amountInput(isOfficial ? 'Base de cálculo' : 'Valor usado no cálculo',defaults.base,'R$',isOfficial ? 'Use o valor sobre o qual os percentuais serão aplicados.' : 'Você pode trocar este valor para ver como o total dos tributos muda.');
+    const base = amountInput(isOfficial ? 'Base de cálculo' : 'Valor usado no cálculo',initial.base,'R$',isOfficial ? 'Use o valor sobre o qual os percentuais serão aplicados.' : 'Você pode trocar este valor para ver como o total dos tributos muda.');
     const entries = kind === 'regular' ? {
-      cbs:amountInput('Alíquota da CBS',defaults.rates.cbs,'%'),
-      ibsEstadual:amountInput('Alíquota estadual do IBS',defaults.rates.ibsEstadual,'%'),
-      ibsMunicipal:amountInput('Alíquota municipal do IBS',defaults.rates.ibsMunicipal,'%'),
+      cbs:amountInput('Alíquota da CBS',initial.rates.cbs,'%'),
+      ibsEstadual:amountInput('Alíquota estadual do IBS',initial.rates.ibsEstadual,'%'),
+      ibsMunicipal:amountInput('Alíquota municipal do IBS',initial.rates.ibsMunicipal,'%'),
     } : {
-      aliquotaIbs:amountInput('Alíquota efetiva do IBS',defaults.aliquotaIbs,'%'),
-      aliquotaCbs:amountInput('Alíquota efetiva da CBS',defaults.aliquotaCbs,'%'),
-      impostoSeletivo:amountInput('Imposto seletivo já calculado',defaults.impostoSeletivo,'R$', 'Informe zero se o imposto não fizer parte deste item.'),
+      aliquotaIbs:amountInput('Alíquota efetiva do IBS',initial.aliquotaIbs,'%'),
+      aliquotaCbs:amountInput('Alíquota efetiva da CBS',initial.aliquotaCbs,'%'),
+      impostoSeletivo:amountInput('Imposto seletivo já calculado',initial.impostoSeletivo,'R$', 'Informe zero se o imposto não fizer parte deste item.'),
     };
     form.append(fields(base));
     const rateFields = fields(...Object.values(entries));
@@ -299,7 +311,27 @@ function renderCalculator(kind, host, opts) {
     submit.type = 'submit';
     form.append(error, pack(make('div', 'action-row'), submit));
     let revision = 0;
-    form.addEventListener('input',() => { ++revision; output.replaceChildren(); error.hidden = true; });
+    form.addEventListener('input',() => {
+      ++revision;
+      output.replaceChildren();
+      error.hidden = true;
+      if (exampleNotice) exampleNotice.textContent = '';
+    });
+    if (isOfficial) {
+      fillExample.addEventListener('click',() => {
+        for (const [name,entry] of Object.entries(codes)) {
+          entry.control.value = defaults[name];
+          entry.control.dispatchEvent(new Event('input',{bubbles:true}));
+        }
+        const amounts = kind === 'regular' ? defaults.rates : defaults;
+        for (const [name,entry] of Object.entries({base,...entries})) {
+          const value = name === 'base' ? defaults.base : amounts[name];
+          entry.control.value = value.replace('.',',');
+          entry.control.dispatchEvent(new Event('input',{bubbles:true}));
+        }
+        exampleNotice.textContent = 'Os campos foram preenchidos com os dados do exemplo.';
+      });
+    }
     form.addEventListener('submit',async e => {
       e.preventDefault();
       if (submit.disabled) return;
@@ -307,7 +339,7 @@ function renderCalculator(kind, host, opts) {
       submit.disabled = true; submit.textContent = 'Calculando…';
       form.setAttribute('aria-busy','true'); error.hidden = true;
       try {
-        const inputs = {...defaults,base:base.read()};
+        const inputs = isOfficial ? {base:base.read()} : {...defaults,base:base.read()};
         if (codes) for (const [name,entry] of Object.entries(codes)) inputs[name] = entry.read();
         if (regularRatesApply()) {
           const edit = Object.fromEntries(Object.entries(entries).map(([key,entry]) => [key,entry.read()]));

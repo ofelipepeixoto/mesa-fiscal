@@ -4,10 +4,17 @@ WORKDIR /src
 COPY --from=upstream . .
 # O CI do Simples gera o catálogo a partir das migrações do Regime Regular.
 COPY --from=catalog /flyway ./flyway
+# Um teste de NFS-e do código-fonte espera o comportamento anterior à migração V0059.
+# Execute-o na base correspondente. A imagem final sempre usa TODAS as migrações.
+ENV APPLICATION_DB_DOWNLOAD_URL=""
 RUN mkdir -p calculadora/db \
-    && mvn -B -ntp flyway:migrate -Dflyway.configFiles=./flyway/flyway-pro.conf \
+    && mvn -B -ntp flyway:migrate -Dflyway.target=58 -Dflyway.configFiles=./flyway/flyway-pro.conf \
     && test -s calculadora/db/calculadora-pro.db \
-    && APPLICATION_DB_DOWNLOAD_URL="" mvn -B -ntp -Dtest=SimplesNacionalControllerTest package
+    && mvn -B -ntp -Dtest=SimplesNacionalControllerTest test \
+    && grep -q 'tests="24"' target/surefire-reports/TEST-*.SimplesNacionalControllerTest.xml
+RUN mvn -B -ntp flyway:migrate -Dflyway.configFiles=./flyway/flyway-pro.conf \
+    && mvn -B -ntp '-Dtest=SimplesNacionalControllerTest,!SimplesNacionalControllerTest#naoImplementadoTambemEmNfse' package \
+    && grep -q 'tests="23"' target/surefire-reports/TEST-*.SimplesNacionalControllerTest.xml
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app

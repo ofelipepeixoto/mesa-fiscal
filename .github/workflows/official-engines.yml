@@ -17,6 +17,10 @@ on:
       - 'public/exemplo-nfse.xml'
       - 'public/danfse-*'
       - 'public/flows.mjs'
+      - 'public/assistente.mjs'
+      - 'public/app.mjs'
+      - 'public/styles.css'
+      - 'test/**'
       - 'public/engine/**'
       - 'scripts/testar-danfse-navegador.mjs'
 
@@ -36,6 +40,11 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+      - name: Verificar contratos e versão estática
+        run: |
+          node --test test/*.test.mjs
+          node scripts/build.mjs
+          node scripts/testar-motor-wasm.mjs
       - name: Gerar o PDF no Chrome sem enviar o XML
         run: |
           chromedriver --port=9515 > "$RUNNER_TEMP/chromedriver.log" 2>&1 &
