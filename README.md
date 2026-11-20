@@ -62,7 +62,7 @@ As referências dos exemplos de educação e de venda estão disponíveis no [pr
 
 Nesta revisão, as calculadoras usam Java 25 e o catálogo migrado até V0073. A construção do regime regular executa os testes oficiais de arredondamento. A do Simples executa os testes do controlador e da validação da nomenclatura no mesmo banco que acompanha o serviço.
 
-Os dois projetos de origem declaram Spring Boot 4.1.2. O Mesa Fiscal aplica o patch de segurança 4.1.3 a essa dependência ao montar os JARs. A construção confere a versão de origem, executa os testes no ambiente atualizado e verifica a versão incluída em cada arquivo final. As duas imagens também usam a opção de proteção do Java publicada nos projetos da Receita. [Patch da distribuição](deploy/spring-parent.sh) · [Aviso de segurança do Spring](https://spring.io/security/cve-2026-59414/)
+Os dois projetos de origem declaram Spring Boot 4.1.2. O Mesa Fiscal aplica o patch de segurança 4.1.3 a essa dependência ao montar os JARs. A construção confere a versão de origem, executa os testes no ambiente atualizado e verifica a versão incluída em cada arquivo final. O regime regular recebe também o patch Spring Retry 2.0.13. A construção confere o POM original antes de aplicar essa atualização e exige a versão corrigida no JAR final. As duas imagens também usam a opção de proteção do Java publicada nos projetos da Receita. [Patch da distribuição](deploy/spring-parent.sh) · [Aviso de segurança do Spring](https://spring.io/security/cve-2026-59414/) · [Patch Spring Retry](deploy/spring-retry.sh) · [Aviso do Spring Retry](https://spring.io/security/cve-2026-41710/)
 
 ## Atualizações da Receita
 

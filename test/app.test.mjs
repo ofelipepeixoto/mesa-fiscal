@@ -103,6 +103,28 @@ test('a API valida formato e tamanho antes de calcular', async t => {
   assert.equal(await httpStatus(local + '/api/regular', headers, [Buffer.alloc(17 * 1024), Buffer.alloc(17 * 1024)]), 413);
 });
 
+test('a API do Simples recusa um total incompatível sem publicar resultado calculado', async t => {
+  let totalTributos = simplesExample.result.total;
+  const local = await localApp(t, {
+    simplesUrl: 'http://simples:8082/api',
+    fetchImpl: async () => Response.json({
+      objetos: [{ nObj: 1, estadoItem: 'CALCULADO' }],
+      total: { vIBSSNtot: simplesExample.result.ibs, vCBSSNtot: simplesExample.result.cbs,
+        totalIs: simplesExample.result.is, totalTributos },
+    }),
+  });
+  const valid = await fetch(local + '/api/simples', jsonPost(simplesExample.input));
+  assert.equal(valid.status, 200);
+  assert.deepEqual(await valid.json(), { status: 'calculado', ...simplesExample.result });
+  totalTributos = '87.99';
+  const invalid = await fetch(local + '/api/simples', jsonPost(simplesExample.input));
+  assert.equal(invalid.status, 502);
+  const response = await invalid.json();
+  assert.match(response.error, /soma de IBS, CBS e IS/);
+  assert.equal(response.total, undefined);
+  assert.equal(response.status, undefined);
+});
+
 test('o servidor publica só a interface e os arquivos de exemplo', async t => {
   const local = await localApp(t);
   const home = await fetch(local + '/');

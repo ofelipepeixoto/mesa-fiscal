@@ -53,9 +53,23 @@ export async function checkDistribution(dir = join(root, 'public/engine')) {
   return {revision, goVersion: expectedGo, runtime: entry(files['wasm_exec.js']), worker: entry(worker), gzip: entry(files['danfse.wasm.gz']), wasm: original};
 }
 
+export async function compareRebuiltDistribution(dir, manifest, expectedDir = join(root, 'public/engine'), expectedManifest = join(root, 'public/danfse-integrity.mjs')) {
+  await checkDistribution(expectedDir);
+  await checkDistribution(dir);
+  for (const name of ['SHA256SUMS', ...runtimeFiles]) {
+    assert.deepEqual(await readFile(join(dir, name)), await readFile(join(expectedDir, name)), 'A recompilação diverge do arquivo proposto: ' + name);
+  }
+  assert.deepEqual(await readFile(manifest), await readFile(expectedManifest), 'A recompilação diverge do manifesto de integridade proposto.');
+}
+
 async function main([action = 'verificar', dir, destination]) {
   if (action === 'go-version') return console.log(await goVersion());
-  assert.ok(['gerar','verificar'].includes(action), 'Use gerar, verificar ou go-version.');
+  if (action === 'comparar') {
+    assert.ok(dir && destination, 'Informe a distribuição recompilada e seu manifesto.');
+    await compareRebuiltDistribution(resolve(dir), resolve(destination));
+    return console.log('Os sete arquivos distribuídos e o manifesto correspondem à recompilação.');
+  }
+  assert.ok(['gerar','verificar'].includes(action), 'Use gerar, verificar, comparar ou go-version.');
   const pins = await checkDistribution(dir && resolve(dir));
   const text = '// Gerado por scripts/verificar-distribuicao-danfse.mjs após conferir a compilação.\nexport const engine = ' + JSON.stringify(pins, null, 2) + ';\n';
   const file = destination ? resolve(destination) : join(root, 'public/danfse-integrity.mjs');

@@ -1,0 +1,102 @@
+name: Atualizar dependências do gerador de PDF
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '41 10 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atualizar-dependencias-danfse
+  cancel-in-progress: false
+
+jobs:
+  preparar:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    outputs:
+      mudou: ${{ steps.diff.outputs.mudou }}
+    steps:
+      - name: Obter a revisão aprovada
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Ler a versão fixada de Go
+        id: pins
+        run: echo "go=$(node scripts/verificar-distribuicao-danfse.mjs go-version)" >> "$GITHUB_OUTPUT"
+      - name: Preparar Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version: ${{ steps.pins.outputs.go }}
+          cache: false
+      - name: Resolver os patches com os imports do projeto oficial
+        run: bash scripts/atualizar-danfse.sh
+      - name: Conferir se os módulos mudaram
+        id: diff
+        run: |
+          if git diff --quiet -- deploy/danfse-go/go.mod deploy/danfse-go/go.sum; then
+            echo 'mudou=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'mudou=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Recompilar a distribuição e conferir os contratos
+        if: steps.diff.outputs.mudou == 'true'
+        run: |
+          bash scripts/compilar-danfse.sh
+          npm ci --ignore-scripts --no-fund --no-audit
+          node --test test/*.test.mjs
+          tar -czf "$RUNNER_TEMP/atualizacao-danfse.tar.gz" deploy/danfse-go/go.mod deploy/danfse-go/go.sum public/engine public/danfse-integrity.mjs public/exemplo-danfse.pdf
+      - name: Guardar a proposta de atualização
+        if: steps.diff.outputs.mudou == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: proposta-danfse
+          path: ${{ runner.temp }}/atualizacao-danfse.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  propor:
+    needs: preparar
+    if: needs.preparar.outputs.mudou == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Obter a revisão de origem da proposta
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Publicar proposta e iniciar a homologação
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          pending=$(gh api --paginate 'repos/{owner}/{repo}/pulls?state=open&per_page=100' --jq '.[] | select(.head.ref | startswith("automation/danfse-patches-")) | .number')
+          if [[ -n "$pending" ]]; then
+            echo 'A proposta anterior aguarda revisão.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh run download "$GITHUB_RUN_ID" --name proposta-danfse --dir "$RUNNER_TEMP/proposta"
+          tar -xzf "$RUNNER_TEMP/proposta/atualizacao-danfse.tar.gz"
+          branch="automation/danfse-patches-$GITHUB_RUN_ID"
+          git switch -c "$branch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add deploy/danfse-go/go.mod deploy/danfse-go/go.sum public/engine public/danfse-integrity.mjs public/exemplo-danfse.pdf
+          git commit -m 'Atualizar patches Go com as fontes oficiais e recompilar DANFSe'
+          git -c credential.helper= -c 'credential.helper=!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; }; f' push origin "HEAD:refs/heads/$branch"
+          printf '%s\n\n%s\n' 'Atualiza os patches dos módulos Go resolvidos com o código-fonte oficial e regenera o WebAssembly, o runtime, as licenças, os hashes e o PDF fictício.' 'Os alvos HTTP e navegador compilaram. A homologação completa, com comparação dos bytes recompilados, govulncheck e cálculos fiscais, deve passar antes do merge.' > "$RUNNER_TEMP/descricao.md"
+          if ! gh pr create --base main --head "$branch" --title 'Atualizar patches do gerador de PDF' --body-file "$RUNNER_TEMP/descricao.md"; then
+            printf '%s\n\n%s\n' 'A proposta foi compilada e os arquivos estão no artefato proposta-danfse desta execução, disponível por sete dias.' "A branch $branch já foi publicada. Confira se GitHub Actions pode criar PRs nas configurações do repositório e abra a proposta dessa branch antes de iniciar a homologação." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          # PRs criadas pelo token do workflow exigem início explícito dos checks.
+          gh workflow run official-engines.yml --ref "$branch"

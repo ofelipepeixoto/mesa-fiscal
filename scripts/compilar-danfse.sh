@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+mode=${1:-gerar}
+[[ "$#" -le 1 && "$mode" =~ ^(gerar|--check)$ ]] || { echo 'Use compilar-danfse.sh [--check].' >&2; exit 1; }
+
 # O download acontece apenas na preparação. O XML do usuário nunca entra neste script.
 root=$(cd "$(dirname "$0")/.." && pwd)
 commit=$(node "$root/scripts/upstreams.mjs" pin danfse)
@@ -41,6 +44,11 @@ done < "$work/modules" > "$work/engine/THIRD-PARTY.txt"
 (cd "$work/engine" && sha256sum BUILD.txt LICENSE-*.txt THIRD-PARTY.txt danfse.wasm.gz wasm_exec.js > SHA256SUMS && sha256sum -c SHA256SUMS)
 node "$root/scripts/verificar-distribuicao-danfse.mjs" gerar "$work/engine" "$work/danfse-integrity.mjs"
 node "$root/scripts/testar-motor-wasm.mjs" "$work/engine" "$work/exemplo-danfse.pdf"
+if [[ "$mode" = --check ]]; then
+  node "$root/scripts/verificar-distribuicao-danfse.mjs" comparar "$work/engine" "$work/danfse-integrity.mjs"
+  echo 'Distribuição recompilada idêntica aos arquivos propostos.'
+  exit 0
+fi
 mkdir -p "$root/public/engine"
 cp -R "$work/engine/." "$root/public/engine/"
 cp "$work/exemplo-danfse.pdf" "$root/public/exemplo-danfse.pdf"
