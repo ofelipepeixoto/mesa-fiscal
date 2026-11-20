@@ -8,3 +8,12 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  # Os módulos Go são preparados por update-danfse.yml com as fontes oficiais.
+  # O grafo e os alertas continuam disponíveis para este manifesto.
+  - package-ecosystem: gomod
+    directory: /deploy/danfse-go
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: '*'
