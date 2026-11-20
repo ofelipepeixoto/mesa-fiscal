@@ -61,9 +61,10 @@ try {
       args: [], script: "return document.querySelector('meta[name=mesa-edicao]')?.content",
     });
     assert.equal(mode, "navegador", "Este teste exige o pacote estático publicado.");
-    for (const [route, total] of [["regular", "R$ 42,72"], ["simples", "R$ 88,00"]]) {
+    for (const [route, title, total] of [["regular", "Regime regular", "R$ 42,72"], ["simples", "Simples Nacional", "R$ 88,00"]]) {
       await click("#menu");
       await click(".sidebar [data-route=" + route + "]");
+      await checkScreen("#" + route, title);
       await click("main form button[type=submit]");
       const selector = ".flow-result .flow-sum strong";
       const result = await command(session + "/element", {using: "css selector", value: selector});
