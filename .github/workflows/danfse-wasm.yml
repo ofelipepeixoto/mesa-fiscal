@@ -29,6 +29,23 @@ jobs:
           go-version: '1.27.4'
           cache: false
 
+      - name: Aplicar correções das dependências e verificar checksums
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          set -euo pipefail
+          go get github.com/labstack/echo/v5@v5.4.6 golang.org/x/image@v0.45.0
+          go mod download
+          go mod verify
+          mkdir -p "$RUNNER_TEMP/overlay"
+          cp go.mod go.sum "$RUNNER_TEMP/overlay/"
+          sha256sum go.mod go.sum
+      - name: Salvar módulos revisados
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: overlay-danfse
+          path: ${{ runner.temp }}/overlay/
+          retention-days: 7
       - name: Compilar e reunir as licenças
         env:
           GOOS: js
@@ -90,3 +107,42 @@ jobs:
           sha=$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/blobs" --input "$RUNNER_TEMP/blob.json" --jq .sha)
           test "$sha" = "$expected"
           printf 'Objeto Git compactado: `%s`\n' "$sha" >> "$GITHUB_STEP_SUMMARY"
+
+  avisos:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: ReceitaFederal/calculadora-rtc-gerador-danfse
+          ref: 8d79e6b2f7fad6375340afcb51c85ed370c64a14
+          persist-credentials: false
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version: '1.27.4'
+          cache: false
+      - name: Auditar os dois comandos com a base da equipe Go
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          set -euo pipefail
+          go get github.com/labstack/echo/v5@v5.4.6 golang.org/x/image@v0.45.0
+          go mod download
+          go mod verify
+          sha256sum go.mod go.sum
+          go install golang.org/x/vuln/cmd/govulncheck@v1.10.0
+          mkdir -p "$RUNNER_TEMP/auditoria"
+          export CGO_ENABLED=0 GOFLAGS=-mod=readonly
+          GOOS=js GOARCH=wasm govulncheck -json ./cmd/danfse-wasm > "$RUNNER_TEMP/auditoria/wasm.json"
+          GOOS=linux GOARCH=amd64 govulncheck -json ./cmd/danfse > "$RUNNER_TEMP/auditoria/http.json"
+          for alvo in wasm http; do
+            jq -s --arg alvo "$alvo" '{alvo:$alvo,configuracao:.[0].config,funcoes_atingidas:([.[]|select(.finding.trace[0].function? != null) | .finding.osv] | unique)}' "$RUNNER_TEMP/auditoria/$alvo.json"
+          done
+      - name: Guardar relatórios de análise
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: avisos-govulncheck
+          path: ${{ runner.temp }}/auditoria/
+          retention-days: 7
+          if-no-files-found: warn
