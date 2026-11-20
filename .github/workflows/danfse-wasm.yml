@@ -34,7 +34,7 @@ jobs:
           GOTOOLCHAIN: local
         run: |
           set -euo pipefail
-          go get github.com/labstack/echo/v5@v5.4.6 golang.org/x/image@v0.45.0 golang.org/x/net@v0.62.0 golang.org/x/mod@v0.40.0 google.golang.org/grpc@v1.83.2
+          go get github.com/labstack/echo/v5@v5.4.6 golang.org/x/image@v0.45.0 golang.org/x/net@v0.62.0 google.golang.org/grpc@v1.83.2
           go mod download
           go mod verify
           mkdir -p "$RUNNER_TEMP/overlay"
@@ -126,7 +126,7 @@ jobs:
           GOTOOLCHAIN: local
         run: |
           set -euo pipefail
-          go get github.com/labstack/echo/v5@v5.4.6 golang.org/x/image@v0.45.0 golang.org/x/net@v0.62.0 golang.org/x/mod@v0.40.0 google.golang.org/grpc@v1.83.2
+          go get github.com/labstack/echo/v5@v5.4.6 golang.org/x/image@v0.45.0 golang.org/x/net@v0.62.0 google.golang.org/grpc@v1.83.2
           go mod download
           go mod verify
           sha256sum go.mod go.sum
