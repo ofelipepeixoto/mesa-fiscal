@@ -88,7 +88,7 @@ jobs:
             echo 'A proposta anterior aguarda revisão. A homologação foi iniciada novamente.' >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          issue=$(gh api --paginate --slurp 'repos/{owner}/{repo}/issues?state=open&per_page=100' --jq 'flatten | map(select(.pull_request == null and .user.login == "github-actions[bot]" and ((.body // "") | startswith("<!-- mesa-fiscal:danfse-deps:v1 -->")))) | first // empty')
+          issue=$(gh api --paginate --slurp 'repos/{owner}/{repo}/issues?state=open&per_page=100' | jq -c 'flatten | map(select(.pull_request == null and .user.login == "github-actions[bot]" and ((.body // "") | startswith("<!-- mesa-fiscal:danfse-deps:v1 -->")))) | first // empty')
           if [[ -n "$issue" ]]; then
             number=$(jq -r .number <<< "$issue")
             pending=$(jq -r '.body | capture("<!-- branch: (?<branch>automation/danfse-patches-[0-9]+) -->").branch' <<< "$issue")
