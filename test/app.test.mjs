@@ -1,12 +1,18 @@
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
+import { resolve } from 'node:path';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
-import { createMesaServer } from '../server/app.mjs';
+import { createMesaServer, isPublicAsset } from '../server/app.mjs';
+import { readLocalJson } from '../server/local-json.mjs';
 import { regularExample } from '../public/regular-study.mjs';
 import { simplesExample } from '../public/simples-study.mjs';
 
-async function localApp(t, options = {}) {
+async function localApp(t, options = {}, onRequest) {
   const server = createMesaServer({ regularUrl: null, simplesUrl: null, danfseUrl: null, ...options });
+  if (onRequest) server.on('request', onRequest);
   await new Promise((resolve, reject) => server.once('error', reject).listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise(resolve => {
     server.close(resolve);
@@ -57,6 +63,8 @@ test('a API aceita a própria origem e recusa host ou origem de outro site', asy
   assert.equal(await httpStatus(url, { origin: local }), 200);
   assert.equal(await httpStatus(url, { host: 'outra-aplicacao.invalid' }), 403);
   assert.equal(await httpStatus(url, { origin: 'https://outra-aplicacao.invalid' }), 403);
+  assert.equal(await httpStatus(url, { 'sec-fetch-site': 'same-origin' }), 200);
+  assert.equal(await httpStatus(url, { 'sec-fetch-site': 'cross-site' }), 403);
 });
 
 test('a verificação de disponibilidade exige o contrato do motor certo', async t => {
@@ -101,7 +109,9 @@ test('o servidor publica só a interface e os arquivos de exemplo', async t => {
   assert.equal(home.status, 200);
   assert.match(await home.text(), /Mesa Fiscal/);
   assert.equal(home.headers.get('x-content-type-options'), 'nosniff');
-  assert.match(home.headers.get('content-security-policy'), /worker-src 'self'/);
+  const policy = home.headers.get('content-security-policy');
+  assert.match(policy, /worker-src 'self' blob:;/);
+  assert.doesNotMatch(policy, /script-src [^;]*blob:/);
   for (const path of ['/server/app.mjs', '/compose.yaml', '/package.json']) {
     assert.equal((await fetch(local + path)).status, 404);
   }
@@ -109,4 +119,87 @@ test('o servidor publica só a interface e os arquivos de exemplo', async t => {
   assert.equal(file.status, 200);
   assert.equal(await file.text(), '');
   assert.match(file.headers.get('content-type'), /application\/xml/);
+});
+
+test('o caminho público permanece dentro da pasta de arquivos depois da resolução', () => {
+  const root = resolve('exemplo', 'publico');
+  assert.equal(isPublicAsset(root, resolve(root, 'documentos', 'manual.pdf')), true);
+  assert.equal(isPublicAsset(root, resolve('exemplo', 'privado', 'manual.pdf')), false);
+  assert.equal(isPublicAsset(root, resolve('exemplo', 'publico-anterior', 'manual.pdf')), false);
+  assert.equal(isPublicAsset(root, resolve(root, '.interno', 'manual.pdf')), false);
+});
+
+test('uma pasta estática absoluta em caminho ou URL publica a edição indicada', async t => {
+  const root = await mkdtemp(resolve(tmpdir(), 'mesa-build-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await writeFile(resolve(root, 'index.html'), '<title>Edição de teste</title>');
+  for (const staticRoot of [root, pathToFileURL(root)]) {
+    const local = await localApp(t, { staticRoot });
+    assert.match(await (await fetch(local + '/')).text(), /Edição de teste/);
+    assert.equal((await fetch(local + '/exemplo-nfse.xml')).status, 404);
+  }
+  assert.throws(() => createMesaServer({ staticRoot: 'dist' }), /caminho absoluto/);
+});
+
+test('um JSON financeiro com texto ilegível gera erro em vez de alterar caracteres', async () => {
+  const decode = bytes => readLocalJson(
+    new Response(bytes, {headers: {'content-type': 'application/json'}}),
+    () => new Error('Resposta incompatível.'),
+  );
+  assert.deepEqual(await decode('{"descricao":"Educação"}'), {descricao: 'Educação'});
+  const truncatedText = Buffer.concat([Buffer.from('{"descricao":"Educa'), Buffer.from([0xc3]), Buffer.from('"}')]);
+  await assert.rejects(decode(truncatedText), /incompatível/);
+});
+
+test('duas abas consultam um único conjunto de estados sem guardar respostas antigas', async t => {
+  const seen = Promise.withResolvers();
+  let requests = 0;
+  let healthCalls = 0;
+  const local = await localApp(t, {
+    danfseUrl: 'http://danfse:8080',
+    fetchImpl: async () => {
+      healthCalls++;
+      await seen.promise;
+      return Response.json({ status: 'ok' });
+    },
+  }, () => { if (++requests === 2) seen.resolve(); });
+  const parallel = await Promise.all([fetch(local + '/api/status'), fetch(local + '/api/status')]);
+  for (const response of parallel) assert.equal((await response.json()).danfse, true);
+  assert.equal(healthCalls, 1);
+  assert.equal((await (await fetch(local + '/api/status')).json()).danfse, true);
+  assert.equal(healthCalls, 2);
+});
+
+test('o gerador aceita nova solicitação assim que os dois documentos em andamento terminam', async t => {
+  let calls = 0;
+  const bothStarted = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  t.after(() => release.resolve());
+  const local = await localApp(t, {
+    danfseUrl: 'http://danfse:8080',
+    fetchImpl: async () => {
+      if (++calls === 2) bothStarted.resolve();
+      await release.promise;
+      return new Response('%PDF-1.4\n%%EOF', {headers: {'content-type': 'application/pdf'}});
+    },
+  });
+  const submit = () => fetch(local + '/api/danfse', {
+    method: 'POST', headers: { 'content-type': 'application/xml' }, body: '<NFSe/>',
+  });
+  const firstTwo = Promise.all([submit(), submit()]);
+  await bothStarted.promise;
+  const busy = await submit();
+  assert.equal(busy.status, 429);
+  assert.ok(Number(busy.headers.get('retry-after')) > 0);
+  assert.equal(calls, 2);
+  release.resolve();
+  for (const response of await firstTwo) {
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.equal(response.headers.get('cross-origin-resource-policy'), 'same-origin');
+    await response.arrayBuffer();
+  }
+  const retry = await submit();
+  assert.equal(retry.status, 200);
+  await retry.arrayBuffer();
 });

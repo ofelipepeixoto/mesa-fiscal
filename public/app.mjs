@@ -52,7 +52,7 @@ const questions = [
   ],
   [
     'Meu XML e minhas simulações ficam salvos?',
-    'A aplicação mantém apenas um resumo nesta aba enquanto ela está aberta. O gerador de PDF roda no navegador quando disponível. Se você usar o serviço local, o arquivo será processado por essa instalação. Um arquivo baixado fica na pasta de downloads que você escolher.',
+    'O histórico desta aba guarda a ferramenta, a hora, o total da simulação e a origem do resultado. Você pode limpá-lo pelo próprio histórico. Para um PDF, registra apenas a geração. O XML é processado no navegador ou, na instalação local, pelo gerador indicado antes do envio. Você pode remover o arquivo selecionado na tela do PDF. Os arquivos baixados ficam na pasta que você escolher.',
   ],
 ];
 
@@ -72,7 +72,7 @@ async function checkAvailability() {
 
   try {
     const response = await fetch('/api/status', {
-      cache: 'no-store',
+      cache: 'no-store', mode: 'same-origin', redirect: 'error', referrerPolicy: 'no-referrer',
       signal: AbortSignal.timeout(3500),
     });
     if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) return;
@@ -242,10 +242,10 @@ function help() {
         <h2>Fontes e instalação</h2>
         <p>O Mesa Fiscal é um projeto independente. As três ferramentas de origem são mantidas pela Receita Federal.</p>
         <ul class="source-list">
-          <li><a href="https://github.com/ReceitaFederal/calculadora-rtc-regime-regular">Calculadora do regime regular</a></li>
-          <li><a href="https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional">Calculadora do Simples Nacional</a></li>
-          <li><a href="https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse">Gerador de DANFSe</a></li>
-          <li><a href="https://github.com/ofelipepeixoto/mesa-fiscal#usar-os-motores-da-receita">Como conectar os motores na instalação local</a></li>
+          <li><a href="https://github.com/ReceitaFederal/calculadora-rtc-regime-regular" rel="noreferrer">Calculadora do regime regular</a></li>
+          <li><a href="https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional" rel="noreferrer">Calculadora do Simples Nacional</a></li>
+          <li><a href="https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse" rel="noreferrer">Gerador de DANFSe</a></li>
+          <li><a href="https://github.com/ofelipepeixoto/mesa-fiscal#usar-os-motores-da-receita" rel="noreferrer">Como conectar os motores na instalação local</a></li>
         </ul>
       </section>
     </div>`;

@@ -18,7 +18,7 @@ const topics = [
     ['Exemplo de serviço', '#regular/exemplo'], ['Exemplo de venda', '#simples/exemplo'],
   ]), ['Como começar uma simulação?', 'Quero experimentar o sistema', 'Abrir um exemplo guiado', 'Fazer uma projeção sem dados reais', 'Testar com um exemplo', 'Simular um imposto']],
   [resposta('privacidade', 'Privacidade da pergunta', 'Esta pergunta é interpretada no seu navegador. O assistente não envia o texto a um modelo, não grava as perguntas e não precisa de CPF, CNPJ ou XML.', [
-    ['Voltar à visão geral', '#inicio'], ['Consultar o código local', './assistente.mjs'],
+    ['Voltar à visão geral', '#inicio'], ['Ver o histórico desta sessão', '#historico'],
   ]), ['Minha pergunta fica salva?', 'Quem tem acesso aos dados?', 'Privacidade das minhas notas', 'O texto sai do navegador?', 'Privacidade e dados pessoais', 'Vocês armazenam minhas perguntas?', 'Minha pergunta é enviada para uma IA?']],
   [resposta('regular', 'Operação no regime regular', 'Se a contabilidade já confirmou o regime regular da operação, abra essa calculadora. O exemplo de educação mostra onde informar os valores.', [
     regular, ['Projeto da Receita', receita + 'regime-regular'],
@@ -97,6 +97,8 @@ export function mountAssistant(container) {
   input.type = 'text';
   input.maxLength = 320;
   input.autocomplete = 'off';
+  input.spellcheck = false;
+  input.setAttribute('autocorrect','off');
   input.placeholder = 'Ex.: Como transformar o XML em PDF?';
   label.append(input);
   const actions = element('div', '', 'action-row');

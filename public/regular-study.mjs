@@ -1,5 +1,7 @@
+import { moneyString, roundHalfEven } from './decimal-fiscal.mjs';
+
 // Item 3 do exemplo publicado pela Receita. A projeção só aceita esse enquadramento.
-export const regularSource = 'https://github.com/ReceitaFederal/calculadora-rtc-regime-regular/blob/150cccbe414d4a5edea703e4f7a424af5aa222c7/docs/exemplos.md';
+export const regularSource = 'https://github.com/ReceitaFederal/calculadora-rtc-regime-regular/blob/f1eebd7ce3157423b1a6aaca7dc1d6c3395452c4/docs/exemplos.md';
 
 const referenceInput = Object.freeze({
   date: '2027-03-10', uf: 'RS', municipio: '4314902', kind: 'servico',
@@ -34,21 +36,10 @@ export function scaledDigits(value, wholeDigits, decimals, field) {
   return BigInt(whole + fraction.padEnd(decimals, '0'));
 }
 
-export function moneyString(cents) {
-  return (cents / 100n).toString() + '.' + (cents % 100n).toString().padStart(2, '0');
-}
-
 export function rateUnits(raw) {
   const units = scaledDigits(raw, 3, 4, 'a alíquota');
   if (units > 1_000_000n) throw fiscalError('Informe alíquotas entre 0 e 100%.');
   return units;
-}
-
-function roundHalfEven(numerator, denominator) {
-  const quotient = numerator / denominator;
-  const twiceRemainder = (numerator % denominator) * 2n;
-  const roundUp = twiceRemainder > denominator || (twiceRemainder === denominator && quotient % 2n === 1n);
-  return roundUp ? quotient + 1n : quotient;
 }
 
 export function projectEducation(input) {
@@ -57,16 +48,17 @@ export function projectEducation(input) {
     throw fiscalError('A projeção usa o serviço de educação do exemplo da Receita. Para outro enquadramento, use o motor local.');
   }
   const baseCents = scaledDigits(input.base, 13, 2, 'a base de cálculo');
-  // 40% da alíquota nominal após a redução. A unidade interna equivale a 10^-8 real.
-  const internalAmount = rate => roundHalfEven(baseCents * rateUnits(rate) * 40n, 100n);
-  const cbsValue = internalAmount(input.rates?.cbs);
-  const ibsValue = internalAmount(input.rates?.ibsEstadual) + internalAmount(input.rates?.ibsMunicipal);
-  const cbsCents = roundHalfEven(cbsValue, 1_000_000n);
-  const ibsCents = roundHalfEven(ibsValue, 1_000_000n);
+  // O motor 1.7.2 publica a alíquota efetiva em quatro casas antes de aplicá-la.
+  const amountCents = rate => {
+    const effectivePercent = roundHalfEven(rateUnits(rate) * 40n, 100n);
+    return roundHalfEven(baseCents * effectivePercent, 1_000_000n);
+  };
+  const cbsCents = amountCents(input.rates?.cbs);
+  const ibsCents = amountCents(input.rates?.ibsEstadual) + amountCents(input.rates?.ibsMunicipal);
   return {
     status: 'projecao', cbs: moneyString(cbsCents), ibs: moneyString(ibsCents), is: null,
     total: moneyString(cbsCents + ibsCents),
     memoria: ['Projeção local do serviço de educação, com data de operação em 10/03/2027.',
-      'Aplicamos 40% de cada alíquota informada sobre a base. Somamos o IBS estadual e o municipal antes de exibir os centavos.'],
+      'Depois da redução de 60%, arredondamos cada alíquota para quatro casas e calculamos o imposto em centavos. O IBS reúne as parcelas estadual e municipal já arredondadas.'],
   };
 }

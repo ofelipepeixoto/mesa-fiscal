@@ -2,26 +2,25 @@ name: Homologar os três motores oficiais
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
     paths:
       - '.github/workflows/official-engines.yml'
       - 'compose.yaml'
+      - 'upstream.lock.env'
+      - 'scripts/upstreams.mjs'
+      - 'package*.json'
+      - 'scripts/build.mjs'
+      - 'public/**'
       - 'Dockerfile'
       - 'deploy/**'
       - 'server/**'
       - 'server.mjs'
       - 'scripts/verify-engines.mjs'
-      - 'public/regular-study.mjs'
-      - 'public/simples-study.mjs'
-      - 'public/exemplo-nfse.xml'
-      - 'public/danfse-*'
-      - 'public/flows.mjs'
-      - 'public/assistente.mjs'
-      - 'public/app.mjs'
-      - 'public/styles.css'
+      - 'scripts/verificar-logs-ci.mjs'
       - 'test/**'
-      - 'public/engine/**'
       - 'scripts/testar-danfse-navegador.mjs'
 
 permissions:
@@ -42,6 +41,10 @@ jobs:
           persist-credentials: false
       - name: Verificar contratos e versão estática
         run: |
+          npm ci --ignore-scripts --no-fund --no-audit
+          npm audit --include=dev --audit-level=high --registry=https://registry.npmjs.org
+          node scripts/upstreams.mjs verify
+          (cd public/engine && sha256sum -c SHA256SUMS)
           node --test test/*.test.mjs
           node scripts/build.mjs
           node scripts/testar-motor-wasm.mjs
@@ -51,6 +54,7 @@ jobs:
           trap 'kill "$!" 2>/dev/null || true' EXIT
           curl --fail --silent --retry 15 --retry-connrefused --retry-delay 1 http://127.0.0.1:9515/status > /dev/null
           node scripts/testar-danfse-navegador.mjs
+          node scripts/testar-danfse-navegador.mjs --dist
   motores:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
@@ -70,8 +74,11 @@ jobs:
         run: docker compose up -d --build
       - name: Conferir resultados pela interface HTTP
         run: node scripts/verify-engines.mjs
+      - name: Conferir a privacidade do XML nos registros locais
+        id: privacidade
+        run: node scripts/verificar-logs-ci.mjs
       - name: Examinar serviços em caso de falha
-        if: failure()
+        if: failure() && steps.privacidade.outcome != 'failure'
         run: |
           docker compose ps -a
           docker compose logs --no-color --tail 100

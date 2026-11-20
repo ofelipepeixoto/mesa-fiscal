@@ -1,6 +1,13 @@
 name: mesa-fiscal
+# Nenhum processo de execução precisa instalar software ou gravar no código.
+x-confinamento: &confinamento
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
 services:
   app:
+    <<: *confinamento
     build:
       context: .
       dockerfile: deploy/app.Dockerfile
@@ -11,26 +18,39 @@ services:
       SIMPLES_URL: http://simples:8082/api
       DANFSE_URL: http://danfse:8080
     depends_on: [regular, simples, danfse]
-    networks: [motores]
+    networks: [interface, motores]
   regular:
+    <<: *confinamento
     build:
       context: .
       dockerfile: deploy/regular.Dockerfile
       additional_contexts:
-        upstream: https://github.com/ReceitaFederal/calculadora-rtc-regime-regular.git#150cccbe414d4a5edea703e4f7a424af5aa222c7
+        upstream: https://github.com/ReceitaFederal/calculadora-rtc-regime-regular.git#f1eebd7ce3157423b1a6aaca7dc1d6c3395452c4
+    # O driver SQLite carrega sua biblioteca nativa em /tmp.
+    tmpfs: ["/tmp:rw,nosuid,nodev,exec,mode=1777,size=128m"]
     networks: [motores]
   simples:
+    <<: *confinamento
     build:
       context: .
       dockerfile: deploy/simples.Dockerfile
       additional_contexts:
-        upstream: https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional.git#c5b0f01c8351c3f0d0795cc617b29d233e9f98df
-        catalog: https://github.com/ReceitaFederal/calculadora-rtc-regime-regular.git#150cccbe414d4a5edea703e4f7a424af5aa222c7
+        upstream: https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional.git#a926d5a76095ac0295a6612a9a54db7ffead2396
+        catalog: https://github.com/ReceitaFederal/calculadora-rtc-regime-regular.git#f1eebd7ce3157423b1a6aaca7dc1d6c3395452c4
+    # O driver SQLite carrega sua biblioteca nativa em /tmp.
+    tmpfs: ["/tmp:rw,nosuid,nodev,exec,mode=1777,size=128m"]
     networks: [motores]
   danfse:
-    build: https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse.git#8d79e6b2f7fad6375340afcb51c85ed370c64a14
-    platform: linux/amd64
+    <<: *confinamento
+    build:
+      context: .
+      dockerfile: deploy/danfse.Dockerfile
+      additional_contexts:
+        upstream: https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse.git#8d79e6b2f7fad6375340afcb51c85ed370c64a14
     networks: [motores]
 networks:
+  interface:
+    driver: bridge
   motores:
     driver: bridge
+    internal: true

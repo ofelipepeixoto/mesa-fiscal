@@ -11,9 +11,9 @@ test('reproduz o caso oficial do Simples preservando o IS fora da base', () => {
   assert.deepEqual(estimateSimples({ ...input, impostoSeletivo: '0' }), { ...result, is: '0.00', total: '38.00' });
 });
 
-test('somente arredonda na apresentação e preserva casas até quatro nos percentuais', () => {
+test('arredonda cada imposto para o par antes de somar o total do item', () => {
   const tiny = { ...input, base: '1,00', aliquotaCbs: '0,5', aliquotaIbs: '0,5', impostoSeletivo: 0 };
-  assert.deepEqual(estimateSimples(tiny), { ibs: '0.00', cbs: '0.00', is: '0.00', total: '0.01' });
+  assert.deepEqual(estimateSimples(tiny), { ibs: '0.00', cbs: '0.00', is: '0.00', total: '0.00' });
   const granular = { ...tiny, base: '10000.00', aliquotaCbs: '0.1234', aliquotaIbs: '0' };
   assert.equal(estimateSimples(granular).cbs, '12.34');
 });
@@ -26,7 +26,7 @@ test('restringe a análise pedagógica à combinação do exemplo', () => {
 
 test('valida data real, campos monetários, casas decimais e percentuais', () => {
   for (const changed of [{ data: '2027-02-29' }, { documento: '91' }, { classificacao: 1 }, { base: '' }, { base: '-1' },
-    { base: '5.213' }, { aliquotaCbs: '101' }, { aliquotaIbs: '1e-3' }, { atividade: '1' }]) {
+    { base: '5.213' }, { aliquotaCbs: '1000' }, { aliquotaIbs: '1e-3' }, { atividade: '1' }]) {
     assert.throws(() => buildSimplesPayload({ ...input, ...changed }), { status: 400 });
   }
 });
@@ -53,7 +53,7 @@ test('envia um item ao endpoint oficial e extrai o total devolvido', async () =>
       return Response.json(goodResponse);
     },
   });
-  assert.deepEqual(output, result);
+  assert.deepEqual(output, { status: 'calculado', ...result });
 });
 
 test('recusa itens não calculados mesmo com HTTP 200, respostas incompletas e valores suspensos', () => {
@@ -99,4 +99,36 @@ test('valida o destino privado e rejeita respostas maiores que o limite', async 
       headers: { 'content-type': 'application/json' },
     }),
   }), { status: 502 });
+});
+
+test('usa a alíquota integral de até 34 casas, inclusive no exemplo de alta precisão da Receita', () => {
+  const high = { ...input, base: '987654.32', impostoSeletivo: '0', aliquotaIbs: '0.01867380622521988789135487',
+    aliquotaCbs: '1.6839379378389463610262954' };
+  assert.deepEqual(estimateSimples(high), { ibs: '184.43', cbs: '16631.49', is: '0.00', total: '16815.92' });
+  assert.equal(buildSimplesPayload(high).itens[0].pCBSSN, high.aliquotaCbs);
+  const maximum = '999.' + '9'.repeat(34);
+  assert.equal(buildSimplesPayload({ ...input, aliquotaIbs: maximum }).itens[0].pIBSSN, maximum);
+  assert.throws(() => buildSimplesPayload({ ...input, aliquotaIbs: maximum + '0' }), { status: 400 });
+  assert.throws(() => buildSimplesPayload({ ...input, aliquotaCbs: '0.1e0' }), { status: 400 });
+});
+
+test('encaminha NCM de oito dígitos para o motor somente quando informado', () => {
+  const product = { ...input, classificacao: '200003', ncm: '10062010' };
+  assert.equal(buildSimplesPayload(product).itens[0].ncm, '10062010');
+  assert.equal(buildSimplesPayload({ ...input, ncm: '02013000' }).itens[0].ncm, '02013000');
+  for (const ncm of [undefined, null, '', '00', '00000000']) assert.ok(!('ncm' in buildSimplesPayload({ ...input, ncm }).itens[0]));
+  for (const ncm of ['1', 12345678, ' 00 ']) assert.throws(() => buildSimplesPayload({ ...input, ncm }), { status: 400 });
+  assert.throws(() => buildSimplesPayload({ ...input, nbs: '122012000' }), { status: 422 });
+  assert.throws(() => estimateSimples({ ...input, ncm: '10062010' }), { status: 422 });
+});
+
+test('explica a causa oficial quando uma atividade não é calculada, mesmo sob HTTP 200', () => {
+  const descricao = 'A atividade não está vigente na data informada.';
+  const item = { nObj: 1, estadoItem: 'NAO_CALCULADO', motivoEstado: { codigo: 'CATIVSN_DESCONHECIDO', descricao } };
+  assert.throws(() => parseSimplesResult({ objetos: [item], total: {} }), { status: 422, message: descricao });
+});
+
+test('devolve ao usuário o motivo da rejeição do código de produto', () => {
+  const item = { nObj: 1, estadoItem: 'INCONSISTENCIA_ENTRADA', erros: [{ code: 'VSN-042', detail: 'A classificação exige o NCM completo.' }] };
+  assert.throws(() => parseSimplesResult({ objetos: [item] }), { status: 422, message: 'A classificação exige o NCM completo. (VSN-042)' });
 });

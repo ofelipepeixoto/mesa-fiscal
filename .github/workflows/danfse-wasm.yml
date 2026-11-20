@@ -14,56 +14,72 @@ permissions:
 jobs:
   compilar:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
+    outputs:
+      motor_sha256: ${{ steps.artefato.outputs.motor_sha256 }}
     steps:
-      - name: Obter a revisão oficial
+      - name: Obter a revisão da aplicação
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          repository: ReceitaFederal/calculadora-rtc-gerador-danfse
-          ref: 8d79e6b2f7fad6375340afcb51c85ed370c64a14
+          ref: ${{ github.sha }}
           persist-credentials: false
-
+      - name: Versão de Go registrada
+        id: pins
+        run: |
+          echo "go=$(node scripts/verificar-distribuicao-danfse.mjs go-version)" >> "$GITHUB_OUTPUT"
+          echo "upstream=$(node scripts/upstreams.mjs pin danfse)" >> "$GITHUB_OUTPUT"
       - name: Preparar Go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
         with:
-          go-version: '1.27.1'
+          go-version: ${{ steps.pins.outputs.go }}
           cache: false
-
-      - name: Compilar e reunir as licenças
+      - name: Compilar e testar com o mesmo procedimento local
+        run: |
+          bash scripts/compilar-danfse.sh
+          node scripts/verificar-distribuicao-danfse.mjs
+      - name: Registrar dependências e examinar avisos publicados pela equipe Go
         env:
-          GOOS: js
-          GOARCH: wasm
-          CGO_ENABLED: '0'
+          REVISION: ${{ steps.pins.outputs.upstream }}
           GOTOOLCHAIN: local
         run: |
           set -euo pipefail
-          out="$RUNNER_TEMP/engine"
-          mkdir -p "$out"
-          go build -mod=readonly -trimpath -buildvcs=false -ldflags='-s -w' -o "$out/danfse.wasm" ./cmd/danfse-wasm
-          go mod verify
-          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" "$out/"
-          cp "$(go env GOROOT)/LICENSE" "$out/LICENSE-Go.txt"
-          cp LICENSE "$out/LICENSE-DANFSe.txt"
-          go list -deps -mod=readonly -f '{{with .Module}}{{.Path}}|{{.Dir}}{{end}}' ./cmd/danfse-wasm | sort -u > "$RUNNER_TEMP/modules"
-          while IFS='|' read -r mod dir; do
-            if [ -z "$dir" ] || [ "$mod" = "danfse-service" ]; then continue; fi
-            printf '\n============ %s ============\n' "$mod"
-            find "$dir" -maxdepth 2 -type f \( -iname 'license*' -o -iname 'notice*' -o -iname 'copying*' \) -print0 | sort -z | xargs -0 -r cat
-          done < "$RUNNER_TEMP/modules" > "$out/THIRD-PARTY.txt"
-          go version > "$out/BUILD.txt"
-          go list -deps -mod=readonly -f '{{with .Module}}{{.Path}} {{.Version}}{{end}}' ./cmd/danfse-wasm | sort -u >> "$out/BUILD.txt"
-          printf 'Fonte: https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse/commit/%s\n' "$(git rev-parse HEAD)" >> "$out/BUILD.txt"
-          cd "$out"
-          sha256sum danfse.wasm >> BUILD.txt
-          gzip -9 -n danfse.wasm
-          sha256sum BUILD.txt LICENSE-*.txt THIRD-PARTY.txt danfse.wasm.gz wasm_exec.js > SHA256SUMS
-          sha256sum -c SHA256SUMS
+          go install golang.org/x/vuln/cmd/govulncheck@v1.10.0
+          git init -q "$RUNNER_TEMP/fontes"
+          git -C "$RUNNER_TEMP/fontes" fetch -q --depth 1 https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse.git "$REVISION"
+          git -C "$RUNNER_TEMP/fontes" checkout -q --detach FETCH_HEAD
+          cd "$RUNNER_TEMP/fontes"
+          test "$(git rev-parse HEAD)" = "$REVISION"
+          sha256sum -c "$GITHUB_WORKSPACE/deploy/danfse-go/upstream.sha256"
+          cp "$GITHUB_WORKSPACE/deploy/danfse-go/go.mod" "$GITHUB_WORKSPACE/deploy/danfse-go/go.sum" ./
+          export CGO_ENABLED=0 GOFLAGS=-mod=readonly
+          GOOS=js GOARCH=wasm govulncheck -json ./cmd/danfse-wasm > "$RUNNER_TEMP/avisos-wasm.json"
+          GOOS=linux GOARCH=amd64 govulncheck -json ./cmd/danfse > "$RUNNER_TEMP/avisos-http.json"
+          for target in wasm http; do
+            jq -s --arg target "$target" '[.[] | select(.finding.trace[0].function? != null) | .finding.osv] | unique | {alvo:$target,avisos:.}' "$RUNNER_TEMP/avisos-$target.json"
+          done
+      - name: Salvar resultados da análise de dependências
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: analise-go
+          path: ${{ runner.temp }}/avisos-*.json
+          if-no-files-found: error
+          retention-days: 7
 
+      - name: Revisar achados alcançáveis antes de disponibilizar o motor
+        run: |
+          set -eu
+          for target in wasm http; do
+            jq -s -e 'all(.[]; .finding.trace[0].function? == null)' "$RUNNER_TEMP/avisos-$target.json" >/dev/null
+          done
+
+      - name: Identificar o binário que passou pela verificação
+        id: artefato
+        run: echo "motor_sha256=$(sha256sum public/engine/danfse.wasm.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - name: Disponibilizar o motor
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: motor-danfse-browser
-          path: ${{ runner.temp }}/engine/
+          path: public/engine/
           if-no-files-found: error
           retention-days: 7
 
@@ -79,11 +95,16 @@ jobs:
       - name: Verificar o binário e preparar seu objeto Git
         env:
           GH_TOKEN: ${{ github.token }}
+          MOTOR_SHA256: ${{ needs.compilar.outputs.motor_sha256 }}
         run: |
           set -euo pipefail
           gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name motor-danfse-browser --dir engine
           cd engine
-          sha256sum -c SHA256SUMS
+          test -f danfse.wasm.gz && test ! -L danfse.wasm.gz
+          test "$(stat -c %s danfse.wasm.gz)" -le 33554432
+          [[ "$MOTOR_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          actual=$(sha256sum danfse.wasm.gz | cut -d' ' -f1)
+          test "$actual" = "$MOTOR_SHA256"
           git init -q "$RUNNER_TEMP/hash"
           expected=$(git -C "$RUNNER_TEMP/hash" hash-object --stdin < danfse.wasm.gz)
           jq -Rs '{encoding:"base64",content:.}' < <(base64 -w 0 danfse.wasm.gz) > "$RUNNER_TEMP/blob.json"

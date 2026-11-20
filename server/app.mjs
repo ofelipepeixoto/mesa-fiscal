@@ -1,14 +1,17 @@
 import { createServer } from 'node:http';
-import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
-import { resolve, extname, sep } from 'node:path';
+import { createReadStream, realpathSync } from 'node:fs';
+import { realpath, stat } from 'node:fs/promises';
+import { finished } from 'node:stream/promises';
+import { resolve, extname, isAbsolute, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { calculateRegular, serviceAddress as regularAddress } from './regular.mjs';
 import { calculateSimples, listSimplesActivities, serviceUrl as simplesAddress, SIMPLES_PATH } from './simples.mjs';
 import { generateDanfse, serviceAddress as danfseAddress, MAX_XML_BYTES } from './danfse.mjs';
 import { readLocalJson } from './local-json.mjs';
 
-const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
+const defaultStaticRoot = new URL('../public/', import.meta.url);
+// Dois PDFs simultâneos podem ocupar 64 MiB só nas respostas, além do XML e do motor.
+const maxActiveDocuments = 2;
 const types = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
@@ -17,7 +20,13 @@ const types = {
   '.woff2': 'font/woff2',
 };
 const localNames = new Set(['localhost', '127.0.0.1', '[::1]']);
-const csp = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; worker-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+const csp = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; worker-src 'self' blob:; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+
+export function isPublicAsset(directory, path) {
+  if (!path?.startsWith(directory + sep)) return false;
+  const parts = path.slice(directory.length + 1).split(sep);
+  return parts.every(part => part.length > 0 && !part.startsWith('.'));
+}
 
 function fail(status, message) {
   return Object.assign(new Error(message), { status });
@@ -38,7 +47,9 @@ function checkLocalRequest(req) {
     throw fail(403, 'Abra a aplicação pelo endereço local indicado.');
   }
   if (!localNames.has(host.hostname)) throw fail(403, 'Abra a aplicação pelo endereço local indicado.');
-  if (req.headers.origin && req.headers.origin !== host.origin) {
+  const site = req.headers['sec-fetch-site'];
+  if ((site && site !== 'same-origin' && site !== 'none') ||
+      (req.headers.origin && req.headers.origin !== host.origin)) {
     throw fail(403, 'Use a ferramenta na mesma aba da aplicação.');
   }
 }
@@ -97,24 +108,41 @@ async function available(address, fetchImpl, swagger) {
 
 export function createMesaServer({
   regularUrl = process.env.REGULAR_URL, simplesUrl = process.env.SIMPLES_URL,
-  danfseUrl = process.env.DANFSE_URL, fetchImpl = fetch,
+  danfseUrl = process.env.DANFSE_URL, fetchImpl = fetch, staticRoot = defaultStaticRoot,
 } = {}) {
+  const configuredRoot = staticRoot instanceof URL ? fileURLToPath(staticRoot) : staticRoot;
+  if (typeof configuredRoot !== 'string' || !isAbsolute(configuredRoot)) {
+    throw new TypeError('A pasta de arquivos públicos precisa ser um caminho absoluto.');
+  }
+  const publicDir = realpathSync(configuredRoot);
+  let activeDocuments = 0;
+  let statusInProgress;
+
+  function readStatus() {
+    // Abas abertas juntas compartilham a leitura dos catálogos, sem guardar estado após a resposta.
+    if (!statusInProgress) {
+      statusInProgress = Promise.all([
+        available(() => regularAddress(regularUrl), fetchImpl, true),
+        available(() => simplesAddress(simplesUrl, SIMPLES_PATH), fetchImpl, true),
+        available(() => danfseAddress(danfseUrl), fetchImpl, false),
+      ]).then(([regular, simples, danfse]) => ({ regular, simples, danfse }))
+        .finally(() => { statusInProgress = undefined; });
+    }
+    return statusInProgress;
+  }
+
   return createServer({ requestTimeout: 65_000, headersTimeout: 15_000 }, async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Content-Security-Policy', csp);
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
     try {
       const url = new URL(req.url, 'http://localhost');
       if (url.pathname.startsWith('/api/')) {
         checkLocalRequest(req);
         res.setHeader('Cache-Control', 'no-store');
         if (req.method === 'GET' && url.pathname === '/api/status') {
-          const [regular, simples, danfse] = await Promise.all([
-            available(() => regularAddress(regularUrl), fetchImpl, true),
-            available(() => simplesAddress(simplesUrl, SIMPLES_PATH), fetchImpl, true),
-            available(() => danfseAddress(danfseUrl), fetchImpl, false),
-          ]);
-          return json(res, 200, { regular, simples, danfse });
+          return json(res, 200, await readStatus());
         }
         if (req.method === 'GET' && url.pathname === '/api/atividades') {
           const result = await listSimplesActivities(Object.fromEntries(url.searchParams), { baseUrl: simplesUrl, fetchImpl });
@@ -130,13 +158,26 @@ export function createMesaServer({
         }
         if (req.method === 'POST' && url.pathname === '/api/danfse') {
           checkType(req, ['application/xml', 'text/xml']);
-          const result = await generateDanfse(await body(req, MAX_XML_BYTES), {
-            status: url.searchParams.get('stc') ?? '0', receipt: url.searchParams.get('canhoto') ?? 'false',
-            baseUrl: danfseUrl, fetchImpl,
-          });
-          res.writeHead(200, { 'content-type': 'application/pdf', 'content-length': result.length,
-            'content-disposition': 'attachment; filename="danfse.pdf"' });
-          return res.end(result);
+          if (activeDocuments >= maxActiveDocuments) {
+            res.setHeader('Retry-After', '2');
+            throw fail(429, 'O gerador está preparando outros documentos. Tente novamente em instantes.');
+          }
+          activeDocuments++;
+          try {
+            const result = await generateDanfse(await body(req, MAX_XML_BYTES), {
+              status: url.searchParams.get('stc') ?? '0', receipt: url.searchParams.get('canhoto') ?? 'false',
+              baseUrl: danfseUrl, fetchImpl,
+            });
+            if (res.destroyed) return;
+            res.writeHead(200, { 'content-type': 'application/pdf', 'content-length': result.length,
+              'content-disposition': 'attachment; filename="danfse.pdf"' });
+            res.setTimeout(45_000, () => res.destroy());
+            res.end(result);
+            await finished(res, { cleanup: true });
+            return;
+          } finally {
+            activeDocuments--;
+          }
         }
         throw fail(404, 'Essa operação não está disponível.');
       }
@@ -145,15 +186,15 @@ export function createMesaServer({
       let pathname;
       try { pathname = decodeURIComponent(url.pathname); } catch { throw fail(400, 'Endereço inválido.'); }
       const asset = resolve(publicDir, '.' + (pathname === '/' ? '/index.html' : pathname));
-      if (!asset.startsWith(resolve(publicDir) + sep) || pathname.split('/').some(v => v.startsWith('.'))) {
-        throw fail(404, 'Arquivo não encontrado.');
-      }
-      const info = await stat(asset).catch(() => null);
+      if (!isPublicAsset(publicDir, asset)) throw fail(404, 'Arquivo não encontrado.');
+      const target = await realpath(asset).catch(() => null);
+      if (!isPublicAsset(publicDir, target)) throw fail(404, 'Arquivo não encontrado.');
+      const info = await stat(target).catch(() => null);
       if (!info?.isFile()) throw fail(404, 'Arquivo não encontrado.');
       res.writeHead(200, { 'content-type': types[extname(asset)] || 'application/octet-stream',
         'content-length': info.size, 'cache-control': 'no-cache' });
       if (req.method === 'HEAD') return res.end();
-      createReadStream(asset).on('error', () => res.destroy()).pipe(res);
+      createReadStream(target).on('error', () => res.destroy()).pipe(res);
     } catch (err) {
       if (res.headersSent || res.destroyed) return;
       const known = Number.isInteger(err.status);
