@@ -55,17 +55,22 @@ export function parseSimplesResult(response) {
     is: total.totalIs,
     total: total.totalTributos,
   };
-  const amount = /^\d+\.\d{2}$/;
-  if (!Object.values(result).every(value => typeof value === 'string' && amount.test(value))) {
+  const amount = /^\d{1,20}\.\d{2}$/;
+  if (!Object.values(result).every(value => typeof value === 'string' && value === value.trim() && amount.test(value))) {
     throw invalidResponse();
   }
   for (const key of ['vIBSSNtotPendSusp', 'vCBSSNtotPendSusp']) {
     if (total[key] !== undefined) {
-      if (typeof total[key] !== 'string' || !amount.test(total[key])) throw invalidResponse();
+      if (typeof total[key] !== 'string' || total[key] !== total[key].trim() || !amount.test(total[key])) throw invalidResponse();
       if (!/^0+\.00$/.test(total[key])) {
         throw failure(422, 'Há valores pendentes ou suspensos nesta operação. Consulte o detalhamento no motor da Receita.');
       }
     }
+  }
+  const sumCents = [result.ibs, result.cbs, result.is]
+    .reduce((sum, value) => sum + BigInt(value.replace('.', '')), 0n);
+  if (BigInt(result.total.replace('.', '')) !== sumCents) {
+    throw failure(502, 'O motor do Simples devolveu um total diferente da soma de IBS, CBS e IS. Confira a versão instalada.');
   }
   return { status: 'calculado', ...result };
 }

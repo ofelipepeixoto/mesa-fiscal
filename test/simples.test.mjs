@@ -65,6 +65,40 @@ test('recusa itens não calculados mesmo com HTTP 200, respostas incompletas e v
   assert.throws(() => parseSimplesResult({ ...goodResponse, total: { ...goodResponse.total, vIBSSNtotPendSusp: '1.00' } }), { status: 422 });
 });
 
+test('confere a soma de IBS, CBS e IS em centavos inteiros', () => {
+  const cases = [
+    { vIBSSNtot: '0.10', vCBSSNtot: '0.20', totalIs: '0.00', totalTributos: '0.30' },
+    { vIBSSNtot: '000.10', vCBSSNtot: '00.20', totalIs: '0.00', totalTributos: '00.30' },
+    { vIBSSNtot: '0.00', vCBSSNtot: '0.00', totalIs: '0.00', totalTributos: '0.00' },
+    { vIBSSNtot: '99999999999999999999.97', vCBSSNtot: '0.01', totalIs: '0.01', totalTributos: '99999999999999999999.99' },
+  ];
+  for (const total of cases) {
+    assert.equal(parseSimplesResult({ ...goodResponse, total }).total, total.totalTributos);
+  }
+  for (const totalTributos of ['0.29', '0.31']) {
+    assert.throws(() => parseSimplesResult({ ...goodResponse, total: { ...cases[0], totalTributos } }),
+      { status: 502, message: /soma de IBS, CBS e IS/ });
+  }
+  assert.throws(() => parseSimplesResult({ ...goodResponse,
+    total: { ...cases[3], totalTributos: '99999999999999999999.98' },
+  }), { status: 502 });
+});
+
+test('recusa valores fora do formato e do limite aceito pela interface', () => {
+  for (const field of Object.keys(goodResponse.total)) {
+    for (const value of [1.23, '-1.00', '0.001', '0.1', '1e2', '1,00', '1.00\n', '1' + '0'.repeat(20) + '.00']) {
+      assert.throws(() => parseSimplesResult({ ...goodResponse, total: { ...goodResponse.total, [field]: value } }),
+        { status: 502 });
+    }
+    assert.throws(() => parseSimplesResult({ ...goodResponse,
+      total: { ...goodResponse.total, [field]: goodResponse.total[field] + '\n' },
+    }), { status: 502 });
+  }
+  assert.throws(() => parseSimplesResult({ ...goodResponse,
+    total: { ...goodResponse.total, vIBSSNtotPendSusp: '0.00\n' },
+  }), { status: 502 });
+});
+
 test('catálogo filtra atividades incompatíveis em vez de oferecê-las ao usuário', async () => {
   const items = await listSimplesActivities(input, {
     baseUrl: 'http://127.0.0.1:8082/api',

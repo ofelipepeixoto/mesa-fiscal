@@ -5,14 +5,19 @@ ENV JAVA_TOOL_OPTIONS="-XX:-UseBASE64Intrinsics -Dspring.autoconfigure.exclude=o
 WORKDIR /src
 COPY --from=upstream / ./
 COPY deploy/spring-parent.sh /tmp/spring-parent.sh
-RUN sh /tmp/spring-parent.sh \
+COPY deploy/spring-retry.sh /tmp/spring-retry.sh
+RUN sh /tmp/spring-retry.sh \
+    && sh /tmp/spring-parent.sh \
     && mvn --version \
     && mkdir -p calculadora/db \
     && mvn -B -ntp flyway:migrate -Dflyway.configFiles=./flyway/flyway-pro.conf \
     && mvn -B -ntp -Dtest=Teste_CasosFixosArredondamento package \
     && test -s calculadora/db/calculadora-pro.db \
     && test -s target/api-regime-geral.jar \
-    && jar tf target/api-regime-geral.jar | grep -Fx 'BOOT-INF/lib/spring-boot-4.1.3.jar'
+    && jar tf target/api-regime-geral.jar > /tmp/jar-entries.txt \
+    && grep -Fx 'BOOT-INF/lib/spring-boot-4.1.3.jar' /tmp/jar-entries.txt \
+    && grep -Fx 'BOOT-INF/lib/spring-retry-2.0.13.jar' /tmp/jar-entries.txt \
+    && ! grep -Fx 'BOOT-INF/lib/spring-retry-2.0.12.jar' /tmp/jar-entries.txt
 
 FROM eclipse-temurin:25-jre@sha256:945247f9d092703e0c6be92243ef3c51640229e23ab34d353c8dcdc73e6cd4e6
 ENV JAVA_TOOL_OPTIONS="-XX:-UseBASE64Intrinsics -Dspring.autoconfigure.exclude=org.springframework.boot.micrometer.tracing.opentelemetry.autoconfigure.otlp.OtlpTracingAutoConfiguration"
