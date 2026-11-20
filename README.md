@@ -30,33 +30,43 @@ No computador do escritório, instale Docker com o plugin Compose v2.17 ou mais 
 docker compose up --build -d
 ```
 
-A primeira construção precisa de internet para baixar as revisões do GitHub, as imagens e as dependências do Java e do Go. A construção prepara o catálogo SQLite com as migrações da Receita. Depois de construir, a instalação executa os cálculos com os motores locais. O motor regular pode consultar a versão pública do catálogo na inicialização. A imagem do serviço DANFSe usa Linux AMD64. Computadores ARM precisam de emulação para esse contêiner.
+A primeira construção precisa de internet para baixar as revisões do GitHub, as imagens e as dependências do Java e do Go. A construção prepara o catálogo SQLite com as migrações da Receita. Depois de construir, a instalação executa os cálculos com os motores locais. Os serviços fiscais usam uma rede interna sem saída direta para a internet. O contêiner do DANFSe compila para a arquitetura escolhida pelo Docker. A homologação automatizada usa Linux AMD64.
 
 Abra **http://localhost:4173** e escolha uma das calculadoras. A opção **Motor da Receita** fica disponível quando a aplicação reconhece o serviço correspondente. Se a tela já estava aberta durante a inicialização, atualize-a. Somente a porta local da interface é publicada. Cada motor roda na rede interna do Compose. Para desligar, use `docker compose down`. Se você já estiver usando o modo `npm start`, encerre-o antes de iniciar o Compose na mesma porta.
 
-Para conferir a instalação com dados fictícios, use `npm run test:engines` com Node 22+ no computador, enquanto o Compose estiver em execução. O teste envia duas bases por regime e verifica se o serviço oficial de documentos devolve um PDF.
+Para conferir a instalação com dados fictícios, use `npm run test:engines` com Node 22+ no computador, enquanto o Compose estiver em execução. O teste compara os dois regimes com os exemplos, inclui casos de arredondamento e verifica se o gerador oficial devolve um PDF para o XML fictício.
 
 ## O que cada ferramenta faz
 
 | Ferramenta | O que você informa | O que recebe |
 | --- | --- | --- |
 | Regime regular | No exemplo, o valor do serviço de educação. No motor local, também a data, o município, o produto ou serviço e seu enquadramento. | CBS, IBS, eventual IS e memória de cálculo quando devolvida pelo motor. |
-| Simples Nacional | Base do item, percentuais e eventual IS já calculado. No motor local, também o documento, a atividade e a classificação. | Valores dos tributos desse item. A consulta de atividades usa a data e o tipo de documento. |
+| Simples Nacional | Base do item, percentuais e eventual IS já calculado. No motor local, também o documento, a atividade, a classificação e o NCM da mercadoria quando exigido. | Valores dos tributos desse item. A consulta de atividades usa a data e o tipo de documento. |
 | PDF da NFS-e | XML nacional já emitido, até 5 MiB. A situação e o canhoto são opções de apresentação. | Documento auxiliar para leitura ou impressão. A situação selecionada não consulta o cadastro da nota. |
 
 A interface atende um item por operação. A calculadora do Simples cobre vendas a compradores privados com CRT 1 e documentos NF-e (55) ou NFC-e (65). Para a nota nacional de serviço, a ferramenta disponível é o gerador do PDF a partir do XML já emitido. Para datas a partir de 2027, o cenário do regime regular aceita alíquotas informadas e preserva o estado de simulação do motor. O exemplo de educação usa o caso de Porto Alegre, RS, de 10/03/2027. A base de R$ 1.200,00 gera R$ 42,24 de CBS e R$ 0,48 de IBS. No exemplo do Simples, a base de R$ 950,00, com R$ 50,00 de IS informado, resulta em R$ 88,00 no total. Alterar a base ou os percentuais gera uma projeção educativa para aquele mesmo cenário.
 
 ## Fontes, revisões e forks
 
-| Projeto original | Revisão usada | Fork |
+O manifesto versionado reúne os três commits utilizados na construção. A interface e os motores compartilham essas revisões, e as duas calculadoras Java consultam o catálogo gerado a partir do projeto do regime regular. [Consultar os commits no manifesto](upstream.lock.env)
+
+<!-- upstream-pins:start -->
+| Projeto original | Revisão utilizada | Fork |
 | --- | --- | --- |
-| [Regime regular](https://github.com/ReceitaFederal/calculadora-rtc-regime-regular) | [150cccb](https://github.com/ReceitaFederal/calculadora-rtc-regime-regular/commit/150cccbe414d4a5edea703e4f7a424af5aa222c7) | [ofelipepeixoto/calculadora-rtc-regime-regular](https://github.com/ofelipepeixoto/calculadora-rtc-regime-regular) |
-| [Simples Nacional](https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional) | [c5b0f01](https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional/commit/c5b0f01c8351c3f0d0795cc617b29d233e9f98df) | [ofelipepeixoto/calculadora-rtc-simples-nacional](https://github.com/ofelipepeixoto/calculadora-rtc-simples-nacional) |
-| [Gerador DANFSe](https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse) | [8d79e6b](https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse/commit/8d79e6b2f7fad6375340afcb51c85ed370c64a14) | [ofelipepeixoto/calculadora-rtc-gerador-danfse](https://github.com/ofelipepeixoto/calculadora-rtc-gerador-danfse) |
+| [Regime regular](https://github.com/ReceitaFederal/calculadora-rtc-regime-regular) | [f1eebd7c](https://github.com/ReceitaFederal/calculadora-rtc-regime-regular/commit/f1eebd7ce3157423b1a6aaca7dc1d6c3395452c4) | [Fork do regime regular](https://github.com/ofelipepeixoto/calculadora-rtc-regime-regular) |
+| [Simples Nacional](https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional) | [a926d5a7](https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional/commit/a926d5a76095ac0295a6612a9a54db7ffead2396) | [Fork do Simples Nacional](https://github.com/ofelipepeixoto/calculadora-rtc-simples-nacional) |
+| [Gerador de DANFSe](https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse) | [8d79e6b2](https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse/commit/8d79e6b2f7fad6375340afcb51c85ed370c64a14) | [Fork do gerador de DANFSe](https://github.com/ofelipepeixoto/calculadora-rtc-gerador-danfse) |
+<!-- upstream-pins:end -->
 
-As situações de referência vêm do [exemplo publicado do regime regular](https://github.com/ReceitaFederal/calculadora-rtc-regime-regular/blob/150cccbe414d4a5edea703e4f7a424af5aa222c7/docs/exemplos.md) e do [teste de integração do Simples](https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional/blob/c5b0f01c8351c3f0d0795cc617b29d233e9f98df/src/test/java/br/gov/serpro/rtc/testesintegracao/simplesnacional/SimplesNacionalControllerTest.java). O [manual da Plataforma CBS, página 16](https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/manuais/reforma-tributaria-do-consumo/manual-plataforma-cbs-21-maio-2026-07h40.pdf) descreve a integração via serviço local.
+As referências dos exemplos de educação e de venda estão disponíveis no [projeto do regime regular](https://github.com/ReceitaFederal/calculadora-rtc-regime-regular/blob/f1eebd7ce3157423b1a6aaca7dc1d6c3395452c4/docs/exemplos.md) e no [teste do controlador do Simples](https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional/blob/a926d5a76095ac0295a6612a9a54db7ffead2396/src/test/java/br/gov/serpro/rtc/testesintegracao/simplesnacional/SimplesNacionalControllerTest.java). O [manual da Plataforma CBS, página 16](https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/manuais/reforma-tributaria-do-consumo/manual-plataforma-cbs-21-maio-2026-07h40.pdf) descreve a integração com os motores locais.
 
-Na construção do Simples, o teste oficial `naoImplementadoTambemEmNfse` espera que a NFS-e de modelo 91 com classificação 820001 ainda esteja sem implementação. A migração V0059 habilita esse tratamento. A construção executa os 24 testes do controlador com a base V0058, aplica a V0059 e repete os 23 testes compatíveis com a nova base. A instalação usa o catálogo atualizado, e o teste das APIs exercita os cálculos do painel nessa versão. [Migração oficial V0059](https://github.com/ReceitaFederal/calculadora-rtc-regime-regular/blob/150cccbe414d4a5edea703e4f7a424af5aa222c7/flyway/sql/manutencao/V0059__habilitacao_820.sql)
+Nesta revisão, as calculadoras usam Java 25 e o catálogo migrado até V0073. A construção do regime regular executa os testes oficiais de arredondamento. A do Simples executa os testes do controlador e da validação da nomenclatura no mesmo banco que acompanha o serviço.
+
+Os dois projetos de origem declaram Spring Boot 4.1.2. O Mesa Fiscal aplica o patch de segurança 4.1.3 a essa dependência ao montar os JARs. A construção confere a versão de origem, executa os testes no ambiente atualizado e verifica a versão incluída em cada arquivo final. As duas imagens também usam a opção de proteção do Java publicada nos projetos da Receita. [Patch da distribuição](deploy/spring-parent.sh) · [Aviso de segurança do Spring](https://spring.io/security/cve-2026-59414/)
+
+## Atualizações da Receita
+
+A verificação diária no GitHub está programada para 07h19 no horário de Brasília. Quando encontra um commit novo, o monitor reúne as diferenças em uma única issue. Para testar uma atualização, prepare uma branch a partir dos commits indicados e abra um PR. A homologação compara os cálculos nos motores reais e testa o PDF no navegador. [Ver como atualizar os motores](docs/atualizar-motores.md)
 
 ## Como o sistema foi construído
 
@@ -66,9 +76,10 @@ A Central de ajuda inclui um assistente que identifica a intenção da pergunta 
 
 A aplicação não pede CNPJ, CPF ou cadastro para simular os exemplos. O histórico registra apenas um resumo das operações da sessão. A aplicação não registra o conteúdo de XMLs nem guarda PDFs no servidor. Os arquivos baixados pelo usuário ficam no local escolhido no navegador.
 
-Para conferir o código e os artefatos:
+Para conferir o código e os artefatos, instale a ferramenta de compilação e execute os testes.
 
 ```sh
+npm ci --ignore-scripts
 npm test
 npm run build
 node scripts/testar-motor-wasm.mjs
@@ -79,3 +90,10 @@ node scripts/testar-motor-wasm.mjs
 ## Referências de interface e estrutura
 
 A página inicial reúne as tarefas frequentes, seguindo o padrão observado na [visão geral da Conta Azul](https://ajuda.contaazul.com/hc/pt-br/articles/115007759147-Vis%C3%A3o-geral-o-que-%C3%A9-e-como-funciona). A orientação sobre o serviço disponível fica na própria tarefa, inspirada na [ajuda de NFS-e da Omie](https://ajuda.omie.com.br/pt-BR/articles/9583614-acompanhando-o-status-de-disponibilidade-de-emissao-de-nfs-e). A divisão dos serviços por finalidade tomou como referência a [documentação de APIs da Conta Azul](https://developers.contaazul.com/open-api-docs/open-api-service). A entrega de HTML leve, com interatividade localizada, segue o princípio descrito na [arquitetura de ilhas do Astro](https://docs.astro.build/en/concepts/islands/).
+
+
+## Proteção do site
+
+A edição publicada entrega JavaScript e CSS compactados, com nomes derivados do conteúdo e verificação de integridade. A política de conteúdo restringe as conexões do navegador à origem da aplicação. Antes de ler o XML, o gerador confere os arquivos usados para produzir o PDF. O código que roda no navegador continua inspecionável e tem sua versão legível no repositório público.
+
+Os controles do servidor, os limites desta revisão e o canal para relatar problemas estão na [política de segurança](SECURITY.md).

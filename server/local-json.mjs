@@ -15,7 +15,8 @@ export async function readLocalJson(response, invalidResponse) {
       if (size > maxJsonBytes) throw invalidResponse();
       chunks.push(chunk);
     }
-    return JSON.parse(Buffer.concat(chunks, size).toString('utf8'));
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks, size));
+    return JSON.parse(text);
   } catch {
     throw invalidResponse();
   }

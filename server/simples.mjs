@@ -1,5 +1,5 @@
 // Adaptador para o contrato 2.0.0 da calculadora do Simples Nacional.
-// Os valores do exemplo vêm do teste SimplesNacionalControllerTest (c5b0f01).
+// Os valores do exemplo vêm do teste SimplesNacionalControllerTest da versão 1.0.2.
 import { readLocalJson } from './local-json.mjs';
 
 export const SIMPLES_PATH = '/calculadora/observabilidade/simples-nacional';
@@ -36,9 +36,16 @@ export function parseSimplesResult(response) {
   if (item?.nObj !== 1 || typeof item.estadoItem !== 'string') throw invalidResponse();
   if (item.estadoItem !== 'CALCULADO') {
     if (!Object.hasOwn(itemStateMessage, item.estadoItem)) throw invalidResponse();
-    const code = item.erros?.[0]?.code;
+    if (item.estadoItem === 'NAO_CALCULADO' && typeof item.motivoEstado?.descricao === 'string') {
+      const description = item.motivoEstado.descricao.trim().slice(0, 350);
+      if (description) throw failure(422, description);
+    }
+    const issue = item.erros?.[0];
+    const code = issue?.code;
     const suffix = typeof code === 'string' && /^VSN-\d{3}$/.test(code) ? ' (' + code + ')' : '';
-    throw failure(item.estadoItem === 'FALHA_TECNICA' ? 502 : 422, itemStateMessage[item.estadoItem] + suffix);
+    const detail = item.estadoItem === 'INCONSISTENCIA_ENTRADA' && typeof issue?.detail === 'string'
+      ? issue.detail.trim().slice(0, 350) : '';
+    throw failure(item.estadoItem === 'FALHA_TECNICA' ? 502 : 422, (detail || itemStateMessage[item.estadoItem]) + suffix);
   }
   const total = response.total;
   if (!total || typeof total !== 'object') throw invalidResponse();
@@ -60,7 +67,7 @@ export function parseSimplesResult(response) {
       }
     }
   }
-  return result;
+  return { status: 'calculado', ...result };
 }
 
 const localHosts = new Set(['localhost', '127.0.0.1', '[::1]', 'simples']);

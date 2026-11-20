@@ -35,17 +35,18 @@ function heading(title, caption) {
   return pack(make('header', 'flow-head'), make('h1', '', title), make('p', 'muted', caption));
 }
 function blockTitle(title) { return make('h2', 'section-heading', title); }
-function amountInput(label, value, unit = 'R$', hint) {
+function amountInput(label, value, unit = 'R$', hint, rateDigits = 4) {
   const input = make('input');
   input.type = 'text';
   input.inputMode = 'decimal';
   input.required = true;
   input.autocomplete = 'off';
-  input.maxLength = unit === '%' ? 10 : 22;
+  input.maxLength = unit === '%' ? 4 + rateDigits : 22;
   input.value = String(value ?? '').replace('.', ',');
-  input.pattern = unit === '%' ? '[0-9]{1,3}([,.][0-9]{1,4})?' : '([0-9]+|[0-9]{1,3}([.][0-9]{3})+)(,[0-9]{1,2})?|[0-9]+[.][0-9]{1,2}';
-  input.title = unit === '%' ? 'Use um percentual entre 0 e 100, com até quatro casas decimais.' : 'Use um valor em reais, como 1.250,00.';
-  if (unit === '%') input.addEventListener('input', () => {
+  input.pattern = unit === '%' ? '[0-9]{1,3}([,.][0-9]{1,' + rateDigits + '})?' : '([0-9]+|[0-9]{1,3}([.][0-9]{3})+)(,[0-9]{1,2})?|[0-9]+[.][0-9]{1,2}';
+  input.title = unit === '%' ? 'Use até ' + rateDigits + ' casas decimais.' : 'Use um valor em reais, como 1.250,00.';
+  const regularRate = unit === '%' && rateDigits === 4;
+  if (regularRate) input.addEventListener('input', () => {
     input.setCustomValidity(Number(input.value.replace(',', '.')) > 100 ? 'Use um percentual entre 0 e 100.' : '');
   });
   const field = make('div', 'field flow-field');
@@ -58,7 +59,7 @@ function amountInput(label, value, unit = 'R$', hint) {
   if (hint) addHint(field, input, hint);
   return { node: field, control: input, read: () => {
     const raw = input.value.trim();
-    if (unit === '%' && Number(raw.replace(',', '.')) > 100) throw new Error('Confira o percentual em “' + label + '”. Ele deve ficar entre 0 e 100.');
+    if (regularRate && Number(raw.replace(',', '.')) > 100) throw new Error('Confira o percentual em “' + label + '”. Ele deve ficar entre 0 e 100.');
     if (unit === 'R$' && (raw.includes(',') || /^\d{1,3}(?:\.\d{3})+$/.test(raw))) return raw.replaceAll('.', '').replace(',', '.');
     return raw.replace(',', '.');
   } };
@@ -73,7 +74,7 @@ function addHint(field, input, text) {
 function basicField(label, opts = {}) {
   const { options, type = 'text', value, hint, pattern, digits } = opts;
   const input = make(options ? 'select' : 'input');
-  input.required = true;
+  input.required = opts.required ?? true;
   input.id = 'fiscal-' + (++fieldId);
   if (options) {
     if (value == null && !options.some(([optionValue]) => optionValue === '')) {
@@ -126,6 +127,7 @@ function codeFields(kind, defaults) {
     documento: basicField('Tipo de nota', {options:[['55','NF-e · Nota fiscal eletrônica'],['65','NFC-e · Nota fiscal ao consumidor']],value:defaults.documento}),
     atividade: basicField('Código da atividade', {value:defaults.atividade,digits:2,pattern:'[0-9]{2}',hint:'Use os 2 dígitos da atividade no catálogo do motor.'}),
     classificacao: basicField('Classificação tributária', {value:defaults.classificacao,digits:6,pattern:'[0-9]{6}',hint:'Código cClassTrib de 6 dígitos do item.'}),
+    ncm: basicField('NCM da mercadoria (opcional)', {value:defaults.ncm,digits:8,pattern:'[0-9]{8}|00',required:false,hint:'Copie os oito dígitos da nota quando a classificação exigir.'}),
   };
 }
 function modeButton(value, label, active) {
@@ -177,9 +179,11 @@ function showError(box, message) { box.textContent = message; box.hidden = false
 function card(label, amount, total = false) {
   return pack(make('div', 'result-card' + (total ? ' flow-sum' : '')), make('span', 'muted', label), make('strong','',amount));
 }
-function resultOrigin(result, official) {
+export function resultOrigin(result, official) {
   if (!official) return 'Projeção de exemplo';
-  return result.status === 'simulado' ? 'Simulação do motor da Receita' : 'Calculado pelo motor da Receita';
+  if (result?.status === 'simulado') return 'Simulação do motor da Receita';
+  if (result?.status === 'calculado') return 'Calculado pelo motor da Receita';
+  throw new Error('O motor não confirmou se o resultado é um cálculo ou uma simulação. Confira a versão da instalação.');
 }
 function differenceText(total, original) {
   const inCents = value => {
@@ -210,9 +214,14 @@ function presentResult(result, host, official, kind, originalTotal) {
   host.replaceChildren(content);
   content.focus();
 }
-async function callEngine(url, init) {
+export async function callEngine(url, init) {
   let response;
-  try { response = await fetch(url, init); }
+  try {
+    response = await fetch(url, {
+      ...init, mode: 'same-origin', redirect: 'error', referrerPolicy: 'no-referrer',
+      cache: 'no-store', signal: AbortSignal.timeout(65_000),
+    });
+  }
   catch { throw new Error('Não conseguimos acessar o serviço. Verifique a conexão e tente novamente.'); }
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
@@ -257,7 +266,7 @@ function renderCalculator(kind, host, opts) {
       const availability = online ? 'Na versão online, você pode explorar este exemplo. Outras operações estão disponíveis na instalação local.' : 'O motor da Receita está desconectado. O exemplo funciona neste navegador.';
       form.append(make('p','flow-status',availability));
     }
-    const original = kind === 'regular' ? regularExample.source : 'https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional/blob/c5b0f01c8351c3f0d0795cc617b29d233e9f98df/src/test/java/br/gov/serpro/rtc/testesintegracao/simplesnacional/SimplesNacionalControllerTest.java#L41-L97';
+    const original = kind === 'regular' ? regularExample.source : 'https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional/blob/a926d5a76095ac0295a6612a9a54db7ffead2396/src/test/java/br/gov/serpro/rtc/testesintegracao/simplesnacional/SimplesNacionalControllerTest.java';
     const initial = isOfficial ? { rates: {} } : defaults;
     let codes;
     let fillExample;
@@ -283,8 +292,8 @@ function renderCalculator(kind, host, opts) {
       ibsEstadual:amountInput('Alíquota estadual do IBS',initial.rates.ibsEstadual,'%'),
       ibsMunicipal:amountInput('Alíquota municipal do IBS',initial.rates.ibsMunicipal,'%'),
     } : {
-      aliquotaIbs:amountInput('Alíquota efetiva do IBS',initial.aliquotaIbs,'%'),
-      aliquotaCbs:amountInput('Alíquota efetiva da CBS',initial.aliquotaCbs,'%'),
+      aliquotaIbs:amountInput('Alíquota efetiva do IBS',initial.aliquotaIbs,'%',undefined,34),
+      aliquotaCbs:amountInput('Alíquota efetiva da CBS',initial.aliquotaCbs,'%',undefined,34),
       impostoSeletivo:amountInput('Imposto seletivo já calculado',initial.impostoSeletivo,'R$', 'Informe zero se o imposto não fizer parte deste item.'),
     };
     form.append(fields(base));
@@ -320,7 +329,7 @@ function renderCalculator(kind, host, opts) {
     if (isOfficial) {
       fillExample.addEventListener('click',() => {
         for (const [name,entry] of Object.entries(codes)) {
-          entry.control.value = defaults[name];
+          entry.control.value = defaults[name] ?? '';
           entry.control.dispatchEvent(new Event('input',{bubbles:true}));
         }
         const amounts = kind === 'regular' ? defaults.rates : defaults;
@@ -340,7 +349,11 @@ function renderCalculator(kind, host, opts) {
       form.setAttribute('aria-busy','true'); error.hidden = true;
       try {
         const inputs = isOfficial ? {base:base.read()} : {...defaults,base:base.read()};
-        if (codes) for (const [name,entry] of Object.entries(codes)) inputs[name] = entry.read();
+        if (codes) {
+          for (const [name,entry] of Object.entries(codes)) {
+            if (entry.control.required || entry.read()) inputs[name] = entry.read();
+          }
+        }
         if (regularRatesApply()) {
           const edit = Object.fromEntries(Object.entries(entries).map(([key,entry]) => [key,entry.read()]));
           if (kind === 'regular') inputs.rates = edit;
@@ -386,8 +399,9 @@ function renderDocument(host, opts) {
   const caption = make('label','','Arquivo XML da nota'); caption.htmlFor = file.id;
   const fileField = pack(make('div','field flow-upload'), caption, file);
   const useExample = button('Usar o XML de exemplo');
+  const clearFile = button('Remover arquivo');
   const choice = make('p','flow-status'); choice.setAttribute('aria-live','polite');
-  form.append(fileField, pack(make('div','action-row'),useExample), choice);
+  form.append(fileField, pack(make('div','action-row'),useExample,clearFile), choice);
   const status = basicField('Situação da nota', {options:[['0','Válida'],['1','Substituída'],['2','Cancelada']],value:'0',hint:'Informe a situação que consta no seu documento. O gerador não consulta a situação da nota.'});
   const chk = make('input'); chk.type='checkbox'; chk.id='danfse-canhoto';
   const receipt = make('label','flow-check'); receipt.htmlFor = chk.id;
@@ -410,12 +424,16 @@ function renderDocument(host, opts) {
   let busy = false;
   function syncChoice() {
     submit.disabled = busy || !backend || (!example && !file.files?.[0]);
+    clearFile.hidden = !example && !file.files?.[0];
     useExample.setAttribute('aria-pressed',String(example));
     useExample.textContent = example ? 'XML de exemplo selecionado' : 'Usar o XML de exemplo';
     choice.textContent = example ? 'O gerador usará uma nota fictícia.' : '';
   }
   function resetResult() { ++revision; result.replaceChildren(); errors.hidden=true; }
   useExample.addEventListener('click',() => { example = true; file.value = ''; resetResult(); syncChoice(); });
+  clearFile.addEventListener('click',() => {
+    example = false; file.value = ''; resetResult(); syncChoice(); file.focus();
+  });
   file.addEventListener('change',() => { example = false; resetResult(); syncChoice(); });
   form.addEventListener('input',resetResult);
   syncChoice();
@@ -439,13 +457,12 @@ function renderDocument(host, opts) {
     try {
       let xml;
       if (example) {
-        const sample = await callEngine('/exemplo-nfse.xml',{method:'GET'}); xml = await sample.text();
+        const sample = await callEngine('/exemplo-nfse.xml',{method:'GET'}); xml = await sample.blob();
       } else {
         const picked = file.files?.[0];
         if (!picked) throw new Error('Selecione o XML da nota ou use o exemplo.');
         if (picked.size > 5 * 1024 * 1024) throw new Error('O XML excede o limite de 5 MiB. Confira o arquivo selecionado.');
-        try { xml = new TextDecoder('utf-8',{fatal:true}).decode(await picked.arrayBuffer()); }
-        catch { throw new Error('O XML precisa estar no formato UTF-8. Use o arquivo original da nota.'); }
+        xml = picked;
       }
       if (currentRevision !== revision || !form.isConnected) return;
       let pdf;

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
-import { regularExample } from '../public/regular-study.mjs';
-import { simplesExample } from '../public/simples-study.mjs';
+import { regularExample, projectEducation } from '../public/regular-study.mjs';
+import { simplesExample, estimateSimples } from '../public/simples-study.mjs';
 
 const origin = 'http://127.0.0.1:4173';
 const engines = ['regular', 'simples', 'danfse'];
@@ -40,7 +40,7 @@ async function verifyAmounts(path, input, amounts, status) {
   const response = await submit(path, JSON.stringify(input), 'application/json');
   assert.match(response.headers.get('content-type') || '', /application\/json/);
   const actual = await response.json();
-  if (status) assert.equal(actual.status, status, path + ' deve informar o estado devolvido pelo motor.');
+  assert.equal(actual.status, status, path + ' deve informar o estado devolvido pelo motor.');
   for (const [field, amount] of Object.entries(amounts)) {
     assert.equal(actual[field], amount, path + ' devolveu um valor inesperado para ' + field);
   }
@@ -51,9 +51,26 @@ await waitForStack();
 await verifyAmounts('/api/regular', regularExample.input, { cbs: '42.24', ibs: '0.48', total: '42.72' }, 'simulado');
 await verifyAmounts('/api/regular', { ...regularExample.input, base: '2400.00' },
   { cbs: '84.48', ibs: '0.96', total: '85.44' }, 'simulado');
-await verifyAmounts('/api/simples', simplesExample.input, { cbs: '26.12', ibs: '11.88', is: '50.00', total: '88.00' });
+await verifyAmounts('/api/simples', simplesExample.input, { cbs: '26.12', ibs: '11.88', is: '50.00', total: '88.00' }, 'calculado');
 await verifyAmounts('/api/simples', { ...simplesExample.input, base: '1900.00' },
-  { cbs: '52.25', ibs: '23.75', is: '50.00', total: '126.00' });
+  { cbs: '52.25', ibs: '23.75', is: '50.00', total: '126.00' }, 'calculado');
+
+// Verifica a paridade nos casos que mudaram de arredondamento e de precisão.
+const educationCases = [
+  { ...regularExample.input, base: '1000000.00', rates: { ...regularExample.input.rates, cbs: '8.8123' } },
+  { ...regularExample.input, base: '1.00', rates: { cbs: '1.25', ibsMunicipal: '1.25', ibsEstadual: '1.25' } },
+];
+for (const operation of educationCases) {
+  const { cbs, ibs, total } = projectEducation(operation);
+  await verifyAmounts('/api/regular', operation, { cbs, ibs, total }, 'simulado');
+}
+const simplesCases = [
+  { ...simplesExample.input, base: '1.00', impostoSeletivo: '0', aliquotaCbs: '0.5', aliquotaIbs: '0.5' },
+  { ...simplesExample.input, base: '987654.32', impostoSeletivo: '0', aliquotaCbs: '1.6839379378389463610262954', aliquotaIbs: '0.01867380622521988789135487' },
+];
+for (const operation of simplesCases) {
+  await verifyAmounts('/api/simples', operation, estimateSimples(operation), 'calculado');
+}
 
 const xml = await readFile(new URL('../public/exemplo-nfse.xml', import.meta.url));
 const response = await submit('/api/danfse?stc=0&canhoto=false', xml, 'application/xml');

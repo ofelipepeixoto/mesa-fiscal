@@ -1,0 +1,56 @@
+name: Acompanhar projetos oficiais da Receita
+on:
+  schedule:
+    - cron: '19 10 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - upstream.lock.env
+      - scripts/upstreams.mjs
+      - .github/workflows/monitor-upstreams.yml
+
+permissions: {}
+concurrency:
+  group: monitor-projetos-oficiais
+  cancel-in-progress: false
+
+jobs:
+  consultar:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      revisoes: ${{ steps.consulta.outputs.revisoes }}
+    steps:
+      - name: Obter os pins aprovados no Mesa Fiscal
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - id: consulta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          revisoes=$(node scripts/upstreams.mjs check)
+          printf 'revisoes=%s\n' "$revisoes" >> "$GITHUB_OUTPUT"
+          jq -r 'to_entries[] | "- " + .key + " · " + .value.relation + " · " + .value.pin + " → " + .value.head' <<< "$revisoes" >> "$GITHUB_STEP_SUMMARY"
+
+  acompanhamento:
+    needs: consultar
+    permissions:
+      contents: read
+      issues: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Atualizar somente a issue de acompanhamento
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_REPORT: ${{ needs.consultar.outputs.revisoes }}
+        run: node scripts/upstreams.mjs issue >> "$GITHUB_STEP_SUMMARY"

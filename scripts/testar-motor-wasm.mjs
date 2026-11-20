@@ -3,9 +3,13 @@ import { readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import path from "node:path";
 import { gunzipSync } from "node:zlib";
+import { checkDistribution } from "./verificar-distribuicao-danfse.mjs";
+import { engine as shipped } from "../public/danfse-integrity.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const dir = process.argv[2] || path.join(root, "public", "engine");
+const checked = await checkDistribution(path.resolve(dir));
+if (path.resolve(dir) === path.join(root, "public", "engine")) assert.deepEqual(checked, shipped);
 const xml = await readFile(path.join(root, "public", "exemplo-nfse.xml"), "utf8");
 await import(pathToFileURL(path.resolve(dir, "wasm_exec.js")).href);
 const go = new globalThis.Go();

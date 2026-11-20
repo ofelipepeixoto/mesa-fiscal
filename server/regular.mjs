@@ -1,6 +1,7 @@
+import { moneyString } from '../public/decimal-fiscal.mjs';
 import { randomUUID } from 'node:crypto';
 import { readLocalJson } from './local-json.mjs';
-import { fiscalError, moneyString, rateUnits, scaledDigits } from '../public/regular-study.mjs';
+import { fiscalError, rateUnits, scaledDigits } from '../public/regular-study.mjs';
 
 export { projectEducation, regularExample } from '../public/regular-study.mjs';
 
@@ -72,6 +73,7 @@ export function regularResult(response) {
       throw fiscalError(detail);
     }
     if (item.estadoItem === 'NAO_IMPLEMENTADO') throw fiscalError('O motor ainda não calcula esta situação tributária.');
+    if (item.estadoItem === 'FALHA_TECNICA') throw fiscalError('O motor encontrou uma falha ao calcular o item. Tente novamente.', 502);
     throw incomplete();
   }
   const totals = response.total?.tribCalc;

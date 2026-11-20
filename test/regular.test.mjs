@@ -17,11 +17,19 @@ test('rastreia o item de educação do exemplo publicado e preserva o total', ()
   assert.equal(projectEducation({ ...input, base: '2400,00' }).total, '85.44');
 });
 
-test('usa arredondamento para o par e soma as duas parcelas de IBS antes da exibição', () => {
+test('arredonda cada parcela para o par antes de somar os componentes do IBS', () => {
   const rates = { cbs: '1.25', ibsEstadual: '1.25', ibsMunicipal: '1.25' };
   assert.equal(projectEducation({ ...input, base: '1', rates }).cbs, '0.00');
   assert.equal(projectEducation({ ...input, base: '3', rates }).cbs, '0.02');
-  assert.equal(projectEducation({ ...input, base: '1', rates }).ibs, '0.01');
+  assert.equal(projectEducation({ ...input, base: '1', rates }).ibs, '0.00');
+  assert.equal(projectEducation({ ...input, base: '3', rates }).ibs, '0.04');
+});
+
+test('aplica a alíquota efetiva de educação publicada em quatro casas, conforme o caso T4 da Receita', () => {
+  const result = projectEducation({ ...input, base: '1000000.00', rates: { ...input.rates, cbs: '8.8123' } });
+  assert.equal(result.cbs, '35249.00');
+  assert.equal(result.ibs, '400.00');
+  assert.equal(result.total, '35649.00');
 });
 
 test('a projeção permite mudar só os valores, exige decimais válidos e limita taxas', () => {
@@ -58,10 +66,16 @@ test('rejeita datas inválidas e campos fora do contrato', () => {
 test('somente totaliza um item válido e não transforma erros com HTTP 200 em crédito zero', () => {
   const good = regularResult(observed);
   assert.deepEqual(good, { status: 'simulado', cbs: '42.24', ibs: '0.48', is: null, total: '42.72', memoria: ['Cálculo do exemplo.'] });
-  for (const item of [{ nObj: 1, estadoItem: 'FALHA_TECNICA' }, { nObj: 2, estadoItem: 'CALCULADO' },
-    { nObj: 1, estadoItem: 'INCONSISTENCIA_ENTRADA', erros: [{ detail: 'Confira a classificação.' }] }]) {
-    assert.throws(() => regularResult({ ...observed, objetos: [item] }));
-  }
+  const withState = (estadoItem, extra = {}) => regularResult({
+    ...observed, objetos: [{ ...observed.objetos[0], estadoItem, ...extra }],
+  });
+  assert.equal(withState('CALCULADO').status, 'calculado');
+  assert.throws(() => withState('FALHA_TECNICA'), { status: 502, message: /Tente novamente/ });
+  assert.throws(() => withState('NAO_IMPLEMENTADO'), { status: 422 });
+  assert.throws(() => withState('INCONSISTENCIA_ENTRADA', { erros: [{ detail: 'Confira a classificação.' }] }),
+    { status: 422, message: 'Confira a classificação.' });
+  assert.throws(() => withState('ESTADO_DESCONHECIDO'), { status: 502 });
+  assert.throws(() => withState('CALCULADO', { nObj: 2 }), { status: 502 });
   assert.throws(() => regularResult({ ...observed, objetos: [...observed.objetos, ...observed.objetos] }));
   assert.throws(() => regularResult({ ...observed, total: { tribCalc: { IBSCBSTot: {} } } }));
 });
