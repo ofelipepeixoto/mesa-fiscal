@@ -66,6 +66,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      issues: write
       actions: write
     steps:
       - name: Obter a revisão de origem da proposta
@@ -79,10 +80,29 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          pending=$(gh api --paginate 'repos/{owner}/{repo}/pulls?state=open&per_page=100' --jq '.[] | select(.head.ref | startswith("automation/danfse-patches-")) | .number')
+          marker='<!-- mesa-fiscal:danfse-deps:v1 -->'
+          pending=$(gh api --paginate --slurp 'repos/{owner}/{repo}/pulls?state=open&per_page=100' | jq -r --arg repo "$GH_REPO" 'flatten | map(select(.head.repo.full_name == $repo and (.head.ref | startswith("automation/danfse-patches-")))) | first | .head.ref // empty')
           if [[ -n "$pending" ]]; then
-            echo 'A proposta anterior aguarda revisão.' >> "$GITHUB_STEP_SUMMARY"
+            [[ "$pending" =~ ^automation/danfse-patches-[0-9]+$ ]]
+            gh workflow run official-engines.yml --ref "$pending"
+            echo 'A proposta anterior aguarda revisão. A homologação foi iniciada novamente.' >> "$GITHUB_STEP_SUMMARY"
             exit 0
+          fi
+          issue=$(gh api --paginate --slurp 'repos/{owner}/{repo}/issues?state=open&per_page=100' --jq 'flatten | map(select(.pull_request == null and .user.login == "github-actions[bot]" and ((.body // "") | startswith("<!-- mesa-fiscal:danfse-deps:v1 -->")))) | first // empty')
+          if [[ -n "$issue" ]]; then
+            number=$(jq -r .number <<< "$issue")
+            pending=$(jq -r '.body | capture("<!-- branch: (?<branch>automation/danfse-patches-[0-9]+) -->").branch' <<< "$issue")
+            [[ "$pending" =~ ^automation/danfse-patches-[0-9]+$ ]]
+            exists=$(gh api 'repos/{owner}/{repo}/git/matching-refs/heads/automation/danfse-patches-' | jq --arg branch "$pending" 'map(select(.ref == "refs/heads/" + $branch)) | length')
+            if [[ "$exists" != 0 ]]; then
+              relation=$(gh api "repos/{owner}/{repo}/compare/main...$pending" --jq .status)
+              if [[ "$relation" = ahead || "$relation" = diverged ]]; then
+                gh workflow run official-engines.yml --ref "$pending"
+                printf '%s\n\n%s\n' 'A proposta anterior permanece aguardando revisão. A homologação foi iniciada novamente.' "Acompanhe a issue #$number." >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+            fi
+            gh issue close "$number" --comment 'A branch de atualização foi incorporada, ficou para trás da main ou foi removida. A rotina pode preparar uma nova proposta.'
           fi
           gh run download "$GITHUB_RUN_ID" --name proposta-danfse --dir "$RUNNER_TEMP/proposta"
           tar -xzf "$RUNNER_TEMP/proposta/atualizacao-danfse.tar.gz"
@@ -94,9 +114,18 @@ jobs:
           git commit -m 'Atualizar patches Go com as fontes oficiais e recompilar DANFSe'
           git -c credential.helper= -c 'credential.helper=!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; }; f' push origin "HEAD:refs/heads/$branch"
           printf '%s\n\n%s\n' 'Atualiza os patches dos módulos Go resolvidos com o código-fonte oficial e regenera o WebAssembly, o runtime, as licenças, os hashes e o PDF fictício.' 'Os alvos HTTP e navegador compilaram. A homologação completa, com comparação dos bytes recompilados, govulncheck e cálculos fiscais, deve passar antes do merge.' > "$RUNNER_TEMP/descricao.md"
-          if ! gh pr create --base main --head "$branch" --title 'Atualizar patches do gerador de PDF' --body-file "$RUNNER_TEMP/descricao.md"; then
-            printf '%s\n\n%s\n' 'A proposta foi compilada e os arquivos estão no artefato proposta-danfse desta execução, disponível por sete dias.' "A branch $branch já foi publicada. Confira se GitHub Actions pode criar PRs nas configurações do repositório e abra a proposta dessa branch antes de iniciar a homologação." >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-          # PRs criadas pelo token do workflow exigem início explícito dos checks.
+          # O dispatch explícito executa os checks mesmo sem uma PR criada.
           gh workflow run official-engines.yml --ref "$branch"
+          if gh pr create --base main --head "$branch" --title 'Atualizar patches do gerador de PDF' --body-file "$RUNNER_TEMP/descricao.md" 2> "$RUNNER_TEMP/erro-pr.txt"; then
+            echo 'PR publicada. Aguarda a homologação e a revisão antes de incorporar.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat "$RUNNER_TEMP/erro-pr.txt" >&2
+            if ! grep -Fq 'GitHub Actions is not permitted to create or approve pull requests' "$RUNNER_TEMP/erro-pr.txt"; then
+              exit 1
+            fi
+            compare="https://github.com/$GH_REPO/compare/main...$branch?expand=1"
+            run="https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID"
+            printf '%s\n\n<!-- branch: %s -->\n\n%s\n\n%s\n\n%s\n\n%s\n' "$marker" "$branch" 'Aguardando revisão. A resolução de patches com as fontes oficiais, as duas compilações e os testes locais passaram. A homologação completa foi iniciada na branch e deve passar antes da incorporação.' "[Revisar a comparação e abrir a PR]($compare)." "[Execução que preparou a proposta e artefato proposta-danfse]($run). O artefato fica disponível por sete dias e a branch preserva os arquivos preparados." 'A configuração atual do repositório impede GitHub Actions de criar PRs. A proposta pode ser aberta pelo mantenedor pelo link acima.' > "$RUNNER_TEMP/pendencia.md"
+            gh issue create --title 'Revisar patches do gerador de PDF' --body-file "$RUNNER_TEMP/pendencia.md"
+            printf '%s\n\n%s\n' 'Aguardando revisão. A criação automática de PRs está desligada e a proposta foi registrada em uma issue.' "Revisão e abertura manual da PR: $compare" >> "$GITHUB_STEP_SUMMARY"
+          fi
