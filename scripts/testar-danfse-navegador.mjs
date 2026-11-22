@@ -36,6 +36,23 @@ try {
   }});
   await command(session + "/url", {url: "http://127.0.0.1:" + app.address().port + "/#inicio"});
   async function click(selector) {
+    if (selector.startsWith('.sidebar ')) {
+      const visible = await command(session + '/execute/async', {args: [selector], script: `
+        const [selector, done] = arguments;
+        const deadline = performance.now() + 6000;
+        function inspect() {
+          const element = document.querySelector(selector);
+          const sidebar = element?.closest('.sidebar');
+          const box = element?.getBoundingClientRect();
+          const moving = sidebar?.getAnimations().some(animation => animation.playState === 'running');
+          if (box?.width && box.left >= 0 && box.right <= innerWidth && !moving) done(true);
+          else if (performance.now() >= deadline) done(false);
+          else requestAnimationFrame(inspect);
+        }
+        inspect();
+      `});
+      assert.equal(visible, true, 'O menu precisa terminar de abrir antes do clique.');
+    }
     const element = await command(session + "/element", {using: "css selector", value: selector});
     const ref = element["element-6066-11e4-a52e-4f735466cecf"];
     await command(session + "/element/" + ref + "/click", {});
