@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createMesaServer } from "../server/app.mjs";
 import { calculationVersions } from "../public/calculation-versions.mjs";
+import { verifyDocumentCheck } from './testar-documentos-navegador.mjs';
 
 // O runner inicia o ChromeDriver. O navegador usa a mesma aplicação e CSP do usuário.
 const driver = "http://127.0.0.1:9515";
@@ -159,6 +160,8 @@ try {
     assert.equal(await command(session + '/execute/sync', {args: [],
       script: "return document.querySelectorAll('.history-row').length"}), 0, 'Recarregar deve apagar o histórico.');
   }
+  await verifyDocumentCheck({command, session, click, checkScreen, requests,
+    origin: 'http://127.0.0.1:' + app.address().port});
   await click("#menu");
   await click(".sidebar [data-route=inicio]");
   await checkScreen("#inicio", "Visão geral");

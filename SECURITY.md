@@ -6,6 +6,8 @@ Para relatar um problema, use o [canal privado do GitHub](https://github.com/ofe
 
 Na edição web, as projeções são feitas na aba. O navegador baixa o gerador da Receita, confere sua integridade e só então lê o XML escolhido. O documento e o PDF são processados em memória. O histórico da sessão contém resumos. Um PDF baixado fica no dispositivo do usuário.
 
+A ferramenta opcional de CPF/CNPJ confere somente formato e dígitos na aba. Não faz requisições com o número nem o escreve em histórico, URL, cookies ou armazenamento do navegador. Limpar, trocar tipo, sair da ferramenta e os eventos de saída/restauração da página descartam o campo e o resultado. A interface não comprova existência, titularidade ou regularidade cadastral. A rejeição de entradas cobre máscaras incorretas, caracteres fora de ASCII e sequências repetidas. Os vetores de homologação são públicos e sintéticos.
+
 Na instalação local, as calculadoras recebem os dados pela API local. Quando o usuário usa o serviço HTTP de PDF, o XML passa pelo servidor local e pelo motor DANFSe. A aplicação limita o tamanho da entrada, das respostas e o número de gerações de PDF ao mesmo tempo. A API verifica a origem das requisições. O Compose publica a interface em loopback, executa os motores sem privilégio de root e usa uma rede interna para a comunicação entre serviços.
 
 ## Distribuição

@@ -7,6 +7,7 @@ import { build } from 'esbuild';
 const source = fileURLToPath(new URL('../public/', import.meta.url));
 const output = fileURLToPath(new URL('../dist/', import.meta.url));
 const assets = [
+  'document-validators-LICENSE.txt',
   'marca.svg', 'exemplo-nfse.xml', 'exemplo-danfse.pdf', 'danfse-worker.js',
   'engine/danfse.wasm.gz', 'engine/wasm_exec.js', 'engine/SHA256SUMS',
   'engine/BUILD.txt', 'engine/LICENSE-Go.txt', 'engine/LICENSE-DANFSe.txt', 'engine/THIRD-PARTY.txt',

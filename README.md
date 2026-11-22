@@ -7,6 +7,7 @@ Simule os tributos de uma operação no regime regular ou no Simples Nacional e 
 1. Abra o Mesa Fiscal e escolha **Ver um exemplo** na tela inicial.
 2. Altere o valor da operação e clique em **Calcular projeção**. A tela mostra a parte da CBS, a do IBS e, quando aplicável, o Imposto Seletivo. O Simples trata um item do documento. O DAS mensal exige a apuração da empresa.
 3. Em **PDF da NFS-e**, clique em **Usar o XML de exemplo** e depois em **Gerar PDF**. Quem já tem uma NFS-e nacional pode escolher o próprio XML. O arquivo fica no navegador nesse modo.
+4. Em **Conferir CPF ou CNPJ**, escolha o tipo e clique em **Conferir**. A ferramenta confere formato e dígitos no navegador, aceita CNPJ numérico ou alfanumérico e não consulta existência, titularidade ou situação cadastral. É opcional e não altera os cálculos nem a geração do PDF.
 
 A edição web oferece dois cenários educativos editáveis. Para testar outras classificações fiscais e datas com as tabelas da Receita, use a instalação local abaixo. Um resultado simulado pelo motor tem indicação própria. A aplicação reconhece respostas incompletas e erros do item mesmo quando o serviço responde HTTP 200.
 
@@ -43,6 +44,7 @@ Para conferir a instalação com dados fictícios, use `npm run test:engines` co
 | Regime regular | No exemplo, o valor do serviço de educação. No motor local, também a data, o município, o produto ou serviço e seu enquadramento. | CBS, IBS, eventual IS e memória de cálculo quando devolvida pelo motor. |
 | Simples Nacional | Base do item, percentuais e eventual IS já calculado. No motor local, também o documento, a atividade, a classificação e o NCM da mercadoria quando exigido. | Valores dos tributos desse item. A consulta de atividades usa a data e o tipo de documento. |
 | PDF da NFS-e | XML nacional já emitido, até 5 MiB. A situação e o canhoto são opções de apresentação. | Documento auxiliar para leitura ou impressão. A situação selecionada não consulta o cadastro da nota. |
+| Conferir CPF ou CNPJ | Número com ou sem a máscara padrão. CNPJ aceita letras. | Conferência local de formato e dígitos; sem consulta cadastral. |
 
 A interface atende um item por operação. A calculadora do Simples cobre vendas a compradores privados com CRT 1 e documentos NF-e (55) ou NFC-e (65). Para a nota nacional de serviço, a ferramenta disponível é o gerador do PDF a partir do XML já emitido. Para datas a partir de 2027, o cenário do regime regular aceita alíquotas informadas e preserva o estado de simulação do motor. O exemplo de educação usa o caso de Porto Alegre, RS, de 10/03/2027. A base de R$ 1.200,00 gera R$ 42,24 de CBS e R$ 0,48 de IBS. No exemplo do Simples, a base de R$ 950,00, com R$ 50,00 de IS informado, resulta em R$ 88,00 no total. Alterar a base ou os percentuais gera uma projeção educativa para aquele mesmo cenário.
 
@@ -74,11 +76,11 @@ O painel usa HTML, CSS responsivo e módulos JavaScript nativos. Os exemplos edu
 
 A Central de ajuda inclui um assistente que identifica a intenção da pergunta por similaridade entre palavras e frases de referência em português. Ele mostra uma resposta revisada e o atalho correspondente. Perguntas sobre enquadramento e alíquotas recebem orientação para consultar a contabilidade. A pergunta fica no navegador. Não há chamada a modelos externos nem uso de IA para decidir valores de impostos.
 
-A aplicação não pede CNPJ, CPF ou cadastro para simular os exemplos. O histórico registra apenas um resumo das operações da sessão. A aplicação não registra o conteúdo de XMLs nem guarda PDFs no servidor. Os arquivos baixados pelo usuário ficam no local escolhido no navegador.
+A aplicação não pede CNPJ, CPF ou cadastro para simular os exemplos. A conferência opcional de documentos não envia o número, não o inclui em histórico, URLs, logs ou armazenamento do navegador e limpa o campo ao sair da ferramenta. O histórico registra apenas um resumo das operações da sessão. A aplicação não registra o conteúdo de XMLs nem guarda PDFs no servidor. Os arquivos baixados pelo usuário ficam no local escolhido no navegador.
 
 Cada simulação no histórico também identifica a versão disponível do cálculo. Em **Projeção local**, a identificação cobre a fórmula do regime e o arredondamento em decimais. Em **Motor local**, o histórico registra a identificação do adaptador e as revisões previstas do motor e do catálogo na distribuição. Essas revisões declaradas não atestam a versão do serviço em execução. Uma API antiga ou com metadados inválidos mostra **Versão não informada**. Abra os detalhes da versão para consultar os identificadores completos.
 
-O histórico continua limitado às últimas 60 operações na memória da aba. Limpar ou recarregar apaga os registros. Não guarda as entradas do cálculo, documentos, XMLs ou a memória fiscal completa; por isso, a versão identifica a implementação, mas não permite reproduzir a operação sozinha. PDFs continuam com o registro de geração. [Contrato e verificação das versões](docs/versoes-calculos.md) · [Planejamento da conferência opcional de documentos](docs/proxima-etapa-documentos.md)
+O histórico continua limitado às últimas 60 operações na memória da aba. Limpar ou recarregar apaga os registros. Não guarda as entradas do cálculo, documentos, XMLs ou a memória fiscal completa; por isso, a versão identifica a implementação, mas não permite reproduzir a operação sozinha. PDFs continuam com o registro de geração. [Contrato e verificação das versões](docs/versoes-calculos.md) · [Conferência opcional de documentos](docs/proxima-etapa-documentos.md)
 
 Para conferir o código e os artefatos, instale a ferramenta de compilação e execute os testes.
 

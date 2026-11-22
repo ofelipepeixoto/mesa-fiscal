@@ -2,6 +2,7 @@ import { icon, fillIcons } from './icons.mjs';
 import { renderFlow } from './flows.mjs';
 import { mountAssistant } from './assistente.mjs';
 import { createHistoryEntry, describeCalculationVersion } from './history.mjs';
+import { renderDocumentCheck } from './documents.mjs';
 
 const tools = {
   regular: {
@@ -31,6 +32,7 @@ const titles = {
   inicio: 'Visão geral',
   historico: 'Histórico da sessão',
   ajuda: 'Central de ajuda',
+  documentos: 'Conferir CPF ou CNPJ',
   ...Object.fromEntries(Object.entries(tools).map(([key, tool]) => [key, tool.name])),
 };
 
@@ -52,6 +54,10 @@ const questions = [
     'Os exemplos educativos partem de casos publicados pela Receita. Você pode alterar a base e as alíquotas nos limites descritos na tela. Na instalação com os motores oficiais ligados, os dados são processados pelas calculadoras locais da Receita.',
   ],
   [
+    'Posso conferir um CPF ou CNPJ?',
+    'Use Conferir CPF ou CNPJ para verificar formato e dígitos neste navegador. A ferramenta é opcional, não consulta a Receita e não comprova existência, titularidade ou situação cadastral. O número não entra no histórico e é apagado ao limpar ou sair da ferramenta.',
+  ],
+  [
     'Meu XML e minhas simulações ficam salvos?',
     'O histórico desta aba guarda a ferramenta, a hora, o total da simulação, a origem e a identificação da versão disponível para o cálculo. A revisão prevista de um motor não confirma a versão em execução. Você pode limpar o histórico; ele também é apagado ao recarregar. Para um PDF, registra apenas a geração. O XML é processado no navegador ou, na instalação local, pelo gerador indicado antes do envio. Você pode remover o arquivo selecionado na tela do PDF. Os arquivos baixados ficam na pasta que você escolher.',
   ],
@@ -67,6 +73,7 @@ const history = [];
 const availability = { regular: false, simples: false, danfse: false };
 let lastRoute = '';
 let revision = 0;
+let clearDocumentView;
 
 async function checkAvailability() {
   if (document.querySelector('meta[name="mesa-edicao"]')) return;
@@ -152,6 +159,16 @@ function home() {
     <section class="dash-section">
       <div class="section-heading"><h2>Ferramentas fiscais</h2></div>
       <div class="card-grid">${Object.entries(tools).map(toolCard).join('')}</div>
+    </section>
+    <section class="dash-section">
+      <div class="section-heading"><h2>Conferência de documentos</h2></div>
+      <div class="sample-list">
+        <a class="sample-row" href="#documentos">
+          ${tile('shield', 'forest')}
+          <span class="sample-label"><b>Conferir CPF ou CNPJ</b><small>Formato e dígitos, neste navegador</small></span>
+          <span class="tail"><span>Opcional</span>${icon('chev')}</span>
+        </a>
+      </div>
     </section>
     <section class="dash-section">
       <div class="section-heading"><h2>Exemplos para explorar</h2></div>
@@ -292,7 +309,8 @@ function updateNavigation(key) {
   }
 }
 
-const views = { inicio: home, historico: historyView, ajuda: help };
+const views = { inicio: home, historico: historyView, ajuda: help,
+  documentos: () => { clearDocumentView = renderDocumentCheck(host); } };
 
 async function route() {
   const id = ++revision;
@@ -302,6 +320,8 @@ async function route() {
     return;
   }
   const key = Object.hasOwn(titles, hash) ? hash : 'inicio';
+  clearDocumentView?.();
+  clearDocumentView = undefined;
   updateNavigation(key);
   if (Object.hasOwn(views, key)) {
     views[key]();
@@ -364,4 +384,7 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && !scrim.hidden) restoreMenuFocus();
 });
 window.addEventListener('hashchange', () => void route());
+// Limpa o campo antes de congelar a aba e também quando o navegador a restaura.
+window.addEventListener('pagehide', () => clearDocumentView?.());
+window.addEventListener('pageshow', event => { if (event.persisted) clearDocumentView?.(); });
 void route();
