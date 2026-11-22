@@ -9,6 +9,7 @@ import { createMesaServer, isPublicAsset } from '../server/app.mjs';
 import { readLocalJson } from '../server/local-json.mjs';
 import { regularExample } from '../public/regular-study.mjs';
 import { simplesExample } from '../public/simples-study.mjs';
+import { calculationVersions } from '../public/calculation-versions.mjs';
 
 async function localApp(t, options = {}, onRequest) {
   const server = createMesaServer({ regularUrl: null, simplesUrl: null, danfseUrl: null, ...options });
@@ -115,7 +116,8 @@ test('a API do Simples recusa um total incompatível sem publicar resultado calc
   });
   const valid = await fetch(local + '/api/simples', jsonPost(simplesExample.input));
   assert.equal(valid.status, 200);
-  assert.deepEqual(await valid.json(), { status: 'calculado', ...simplesExample.result });
+  assert.deepEqual(await valid.json(), { status: 'calculado', ...simplesExample.result,
+    calculationVersion: calculationVersions.engine.simples });
   totalTributos = '87.99';
   const invalid = await fetch(local + '/api/simples', jsonPost(simplesExample.input));
   assert.equal(invalid.status, 502);
@@ -123,6 +125,33 @@ test('a API do Simples recusa um total incompatível sem publicar resultado calc
   assert.match(response.error, /soma de IBS, CBS e IS/);
   assert.equal(response.total, undefined);
   assert.equal(response.status, undefined);
+  assert.equal(response.calculationVersion, undefined);
+});
+
+test('a API do regime regular vincula revisões previstas apenas a um resultado aceito', async t => {
+  let valid = true;
+  const local = await localApp(t, {
+    regularUrl: 'http://regular:8080/api/calculadora',
+    fetchImpl: async () => Response.json({
+      objetos: [{ nObj: 1, estadoItem: valid ? 'CALCULO_SIMULADO' : 'FALHA_TECNICA',
+        tribCalc: { IBSCBS: { gIBSCBS: { gCBS: { vCBS: '42.24' }, vIBS: '0.48' } } } }],
+      total: { tribCalc: { IBSCBSTot: { gCBS: { vCBS: '42.24' }, gIBS: { vIBS: '0.48' } } } },
+      calculationVersion: { expectedEngineRevision: '0'.repeat(40) },
+    }),
+  });
+  const response = await fetch(local + '/api/regular', jsonPost(regularExample.input));
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.total, '42.72');
+  assert.equal(result.status, 'simulado');
+  assert.deepEqual(result.calculationVersion, calculationVersions.engine.regular);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  valid = false;
+  const failed = await fetch(local + '/api/regular', jsonPost(regularExample.input));
+  assert.equal(failed.status, 502);
+  const failure = await failed.json();
+  assert.equal(failure.calculationVersion, undefined);
+  assert.equal(failure.total, undefined);
 });
 
 test('o servidor publica só a interface e os arquivos de exemplo', async t => {

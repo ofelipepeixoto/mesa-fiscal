@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createMesaServer } from "../server/app.mjs";
+import { calculationVersions } from "../public/calculation-versions.mjs";
 
 // O runner inicia o ChromeDriver. O navegador usa a mesma aplicação e CSP do usuário.
 const driver = "http://127.0.0.1:9515";
@@ -108,13 +109,45 @@ try {
   assert.equal(result.cleared, true, "Remover arquivo deve descartar a seleção e o PDF.");
   await checkScreen("#danfse", "PDF da nota de serviço");
   await click("#menu");
+  await click(".sidebar [data-route=historico]");
+  await checkScreen("#historico", "Histórico da sessão");
+  const history = await command(session + "/execute/sync", {args: [], script: `
+    const rows = [...document.querySelectorAll('.history-row')];
+    for (const details of document.querySelectorAll('.history-version')) details.open = true;
+    return {count: rows.length, versions: [...document.querySelectorAll('.history-version')].map(e => e.textContent),
+      pdfHasVersion: !!rows[0]?.querySelector('.history-version'),
+      width: document.documentElement.scrollWidth};
+  `});
+  assert.equal(history.count, distribution ? 3 : 1);
+  assert.equal(history.pdfHasVersion, false);
+  assert.equal(history.width, 390, 'As revisões completas não devem causar rolagem horizontal.');
+  if (distribution) {
+    for (const kind of ['regular', 'simples']) {
+      assert.ok(history.versions.some(text => text.includes(calculationVersions.projection[kind].codeRevision)),
+        'O histórico precisa identificar a fórmula utilizada em ' + kind);
+    }
+  }
+  await click('main .section-heading button');
+  assert.equal(await command(session + "/execute/sync", {args: [],
+    script: "return document.querySelectorAll('.history-row').length"}), 0);
+  if (distribution) {
+    await click('main a[href="#regular/exemplo"]');
+    await checkScreen('#regular/exemplo', 'Regime regular');
+    await click('main form button[type=submit]');
+    await command(session + '/element', {using: 'css selector', value: '.flow-result'});
+    await command(session + '/url', {url: 'http://127.0.0.1:' + app.address().port + '/#historico'});
+    await checkScreen('#historico', 'Histórico da sessão');
+    assert.equal(await command(session + '/execute/sync', {args: [],
+      script: "return document.querySelectorAll('.history-row').length"}), 0, 'Recarregar deve apagar o histórico.');
+  }
+  await click("#menu");
   await click(".sidebar [data-route=inicio]");
   await checkScreen("#inicio", "Visão geral");
   assert.ok(requests.some(req => req.method === "GET" && req.path === "/engine/danfse.wasm.gz"));
   assert.ok(requests.some(req => req.method === "GET" && req.path === "/exemplo-nfse.xml"));
   assert.ok(requests.every(req => ["GET","HEAD"].includes(req.method)), "O navegador enviou dados ao servidor.");
   if (distribution) assert.ok(requests.every(req => !req.path.startsWith("/api/")), "A edição estática consultou a API.");
-  console.log(distribution ? "Distribuição estática." : "Instalação local.", "Chrome", launch.capabilities.browserVersion, "a 390 px abriu o menu, gerou PDF de", result.size, "bytes e voltou ao início sem rolagem horizontal ou envio do XML.");
+  console.log(distribution ? "Distribuição estática." : "Instalação local.", "Chrome", launch.capabilities.browserVersion, "a 390 px abriu o menu, conferiu e limpou o histórico, gerou PDF de", result.size, "bytes e voltou ao início sem rolagem horizontal ou envio do XML.");
 } finally {
   if (session) await command(session, undefined, "DELETE");
   app.closeAllConnections();

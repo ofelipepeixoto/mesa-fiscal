@@ -76,6 +76,10 @@ A Central de ajuda inclui um assistente que identifica a intenção da pergunta 
 
 A aplicação não pede CNPJ, CPF ou cadastro para simular os exemplos. O histórico registra apenas um resumo das operações da sessão. A aplicação não registra o conteúdo de XMLs nem guarda PDFs no servidor. Os arquivos baixados pelo usuário ficam no local escolhido no navegador.
 
+Cada simulação no histórico também identifica a versão disponível do cálculo. Em **Projeção local**, a identificação cobre a fórmula do regime e o arredondamento em decimais. Em **Motor local**, o histórico registra a identificação do adaptador e as revisões previstas do motor e do catálogo na distribuição. Essas revisões declaradas não atestam a versão do serviço em execução. Uma API antiga ou com metadados inválidos mostra **Versão não informada**. Abra os detalhes da versão para consultar os identificadores completos.
+
+O histórico continua limitado às últimas 60 operações na memória da aba. Limpar ou recarregar apaga os registros. Não guarda as entradas do cálculo, documentos, XMLs ou a memória fiscal completa; por isso, a versão identifica a implementação, mas não permite reproduzir a operação sozinha. PDFs continuam com o registro de geração. [Contrato e verificação das versões](docs/versoes-calculos.md) · [Planejamento da conferência opcional de documentos](docs/proxima-etapa-documentos.md)
+
 Para conferir o código e os artefatos, instale a ferramenta de compilação e execute os testes.
 
 ```sh

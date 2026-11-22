@@ -1,5 +1,7 @@
 import { regularExample, projectEducation } from './regular-study.mjs';
 import { simplesExample, estimateSimples } from './simples-study.mjs';
+import { calculationVersions } from './calculation-versions.mjs';
+import { snapshotCalculationVersion } from './history.mjs';
 
 const labels = {
   regular: ['Regime regular', 'Simule o IBS e a CBS de uma operação com um produto ou serviço.'],
@@ -360,10 +362,15 @@ function renderCalculator(kind, host, opts) {
           else Object.assign(inputs,edit);
         } else { delete inputs.rates; }
         let result;
+        let calculationVersion;
         if (isOfficial) {
           const response = await callEngine('/api/' + kind, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(inputs)});
           const json = await response.json(); result = json.result ?? json;
-        } else { result = kind === 'regular' ? projectEducation(inputs) : estimateSimples(inputs); }
+          calculationVersion = snapshotCalculationVersion(json.calculationVersion, kind, 'engine');
+        } else {
+          result = kind === 'regular' ? projectEducation(inputs) : estimateSimples(inputs);
+          calculationVersion = calculationVersions.projection[kind];
+        }
         if (currentRevision !== revision || !form.isConnected) return;
         let originalTotal;
         if (!isOfficial) {
@@ -374,7 +381,7 @@ function renderCalculator(kind, host, opts) {
           if (edited) originalTotal = kind === 'regular' ? regularExample.result.total : simplesExample.result.total;
         }
         presentResult(result, output, isOfficial, kind, originalTotal);
-        opts.onComplete?.({kind,title:labels[kind][0],value:currency(result.total),detail:resultOrigin(result,isOfficial)});
+        opts.onComplete?.({kind,title:labels[kind][0],value:currency(result.total),detail:resultOrigin(result,isOfficial),calculationVersion});
       } catch (err) {
         if (form.isConnected && currentRevision === revision) showError(error, err.message);
       } finally { submit.textContent = idleText; submit.disabled = false; form.removeAttribute('aria-busy'); }
