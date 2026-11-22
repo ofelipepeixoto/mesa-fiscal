@@ -46,6 +46,11 @@ jobs:
             bash scripts/compilar-danfse.sh
           fi
           node scripts/verificar-distribuicao-danfse.mjs
+      - name: Instalar extrator de texto para o PDF
+        run: |
+          command -v pdftotext || { sudo apt-get update && sudo apt-get install -y poppler-utils; }
+      - name: Conferir os campos do PDF no WASM
+        run: node scripts/testar-danfse-nt009.mjs
       - name: Registrar dependências e examinar avisos publicados pela equipe Go
         env:
           REVISION: ${{ steps.pins.outputs.upstream }}
@@ -59,8 +64,11 @@ jobs:
           cd "$RUNNER_TEMP/fontes"
           test "$(git rev-parse HEAD)" = "$REVISION"
           sha256sum -c "$GITHUB_WORKSPACE/deploy/danfse-go/upstream.sha256"
+          git apply --check "$GITHUB_WORKSPACE/deploy/danfse-go/nt009-issqn.patch"
+          git apply "$GITHUB_WORKSPACE/deploy/danfse-go/nt009-issqn.patch"
           cp "$GITHUB_WORKSPACE/deploy/danfse-go/go.mod" "$GITHUB_WORKSPACE/deploy/danfse-go/go.sum" ./
           export CGO_ENABLED=0 GOFLAGS=-mod=readonly
+          GOOS=linux GOARCH=amd64 go test ./internal/service -run TestApresentadorDanfse_TotalDeducoesISSQNNT009
           GOOS=js GOARCH=wasm govulncheck -json ./cmd/danfse-wasm > "$RUNNER_TEMP/avisos-wasm.json"
           GOOS=linux GOARCH=amd64 govulncheck -json ./cmd/danfse > "$RUNNER_TEMP/avisos-http.json"
           for target in wasm http; do

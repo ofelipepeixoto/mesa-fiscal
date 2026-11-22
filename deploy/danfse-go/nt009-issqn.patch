@@ -1,0 +1,120 @@
+diff --git a/internal/domain/models/models.go b/internal/domain/models/models.go
+index e4c5ba3..27f62ed 100644
+--- a/internal/domain/models/models.go
++++ b/internal/domain/models/models.go
+@@ -220,14 +220,15 @@ type Subst struct {
+ }
+ 
+ type Valores struct {
+-	VLiq       float64  `xml:"vLiq"`
+-	VBC        float64  `xml:"vBC"`
+-	VISSQN     float64  `xml:"vISSQN"`
+-	PAliqAplic *float64 `xml:"pAliqAplic"`
+-	VCalcBM    float64  `xml:"vCalcBM"`
+-	TpBM       int      `xml:"tpBM"`
+-	VCalcDR    float64  `xml:"vCalcDR"`
+-	VTotalRet  float64  `xml:"vTotalRet"`
++	VLiq               float64  `xml:"vLiq"`
++	VBC                float64  `xml:"vBC"`
++	VISSQN             float64  `xml:"vISSQN"`
++	PAliqAplic         *float64 `xml:"pAliqAplic"`
++	VCalcBM            float64  `xml:"vCalcBM"`
++	TpBM               int      `xml:"tpBM"`
++	VCalcDR            float64  `xml:"vCalcDR"`
++	VCalcAjusteBCISSQN *float64 `xml:"vCalcAjusteBCISSQN"`
++	VTotalRet          float64  `xml:"vTotalRet"`
+ }
+ 
+ type ValoresDPS struct {
+diff --git a/internal/service/danfse_presenter.go b/internal/service/danfse_presenter.go
+index 70425df..9b89431 100644
+--- a/internal/service/danfse_presenter.go
++++ b/internal/service/danfse_presenter.go
+@@ -299,9 +299,10 @@ func (p *ServicoApresentacaoDanfse) montarTributacaoMunicipal(nota models.NFSe)
+ 	if dps.Prest != nil {
+ 		regEsp = dps.Prest.RegTrib.RegEspTrib
+ 	}
++	totalDeducoes := totalDeducoesISSQN(nota)
+ 	exibirOpcionais := nota.InfNFSe.Valores.TpBM > 0 ||
+ 		nota.InfNFSe.Valores.VCalcBM > 0 ||
+-		dps.Valores.VDedRed.VDR > 0 ||
++		totalDeducoes > 0 ||
+ 		dps.Valores.VDescCondIncond.VDescIncond > 0
+ 
+ 	retorno := presentation.DadosTributacaoMunicipal{
+@@ -313,7 +314,7 @@ func (p *ServicoApresentacaoDanfse) montarTributacaoMunicipal(nota models.NFSe)
+ 		NProcessoSusp:        presentation.TracoSeVazio(dadosTribMun.ExigSusp.NProcesso),
+ 		BeneficioMunicipal:   presentation.MapearTipoBeneficioMunicipal(nota.InfNFSe.Valores.TpBM),
+ 		CalculoBM:            presentation.FormatarValorMonetarioOuTraco(calculoBM),
+-		TotalDeducoes:        presentation.FormatarValorMonetarioOuTraco(dps.Valores.VDedRed.VDR),
++		TotalDeducoes:        presentation.FormatarValorMonetarioOuTraco(totalDeducoes),
+ 		DescontoIncond:       presentation.FormatarValorMonetarioOuTraco(dps.Valores.VDescCondIncond.VDescIncond),
+ 		BCISSQN:              presentation.FormatarValorMonetarioOuTraco(nota.InfNFSe.Valores.VBC),
+ 		AliqAplic:            presentation.FormatarNumeroPercentualOuTraco(ptrFloat(nota.InfNFSe.Valores.PAliqAplic)),
+@@ -337,6 +338,14 @@ func (p *ServicoApresentacaoDanfse) montarTributacaoMunicipal(nota models.NFSe)
+ 	return retorno
+ }
+ 
++// Na NT 009, o totalizador da NFS-e substitui a fonte legada de impressão.
++func totalDeducoesISSQN(nota models.NFSe) float64 {
++	if total := nota.InfNFSe.Valores.VCalcAjusteBCISSQN; total != nil {
++		return *total // Zero explícito não autoriza usar a DPS legada.
++	}
++	return nota.InfNFSe.DPS.InfDPS.Valores.VDedRed.VDR
++}
++
+ func temDadosTributacaoMunicipal(nota models.NFSe, trib *models.TribMun, regEsp int, calculoBM float64) bool {
+ 	if trib == nil {
+ 		return false
+@@ -351,7 +360,7 @@ func temDadosTributacaoMunicipal(nota models.NFSe, trib *models.TribMun, regEsp
+ 		strings.TrimSpace(trib.ExigSusp.NProcesso) != "" ||
+ 		nota.InfNFSe.Valores.TpBM != 0 ||
+ 		calculoBM != 0 ||
+-		nota.InfNFSe.DPS.InfDPS.Valores.VDedRed.VDR != 0 ||
++		totalDeducoesISSQN(nota) != 0 ||
+ 		nota.InfNFSe.DPS.InfDPS.Valores.VDescCondIncond.VDescIncond != 0 ||
+ 		nota.InfNFSe.Valores.VBC != 0 ||
+ 		nota.InfNFSe.Valores.PAliqAplic != nil ||
+diff --git a/internal/service/danfse_presenter_test.go b/internal/service/danfse_presenter_test.go
+index f4f8cba..8aad810 100644
+--- a/internal/service/danfse_presenter_test.go
++++ b/internal/service/danfse_presenter_test.go
+@@ -1,6 +1,7 @@
+ package service
+ 
+ import (
++	"encoding/xml"
+ 	"strings"
+ 	"testing"
+ 
+@@ -2062,3 +2063,30 @@ func TestApresentadorDanfse_ExibirPisCofins_EmptyInvalid(t *testing.T) {
+ 		t.Fatal("ExibirPisCofins deve ser true para dCompet inválido")
+ 	}
+ }
++
++func TestApresentadorDanfse_TotalDeducoesISSQNNT009(t *testing.T) {
++	for _, tc := range []struct {
++		nome, novosValores, valoresDPS, esperado string
++		visivel                                  bool
++	}{
++		{"novo totalizador", "<vCalcAjusteBCISSQN>85.00</vCalcAjusteBCISSQN>", "", "R$ 85,00", true},
++		{"novo prevalece sem somar fontes", "<vCalcDR>40.00</vCalcDR><vCalcAjusteBCISSQN>85.00</vCalcAjusteBCISSQN>", "<vDedRed><vDR>35.00</vDR></vDedRed>", "R$ 85,00", true},
++		{"zero explícito não recorre ao legado", "<vCalcAjusteBCISSQN>0.00</vCalcAjusteBCISSQN>", "<vDedRed><vDR>35.00</vDR></vDedRed>", "-", false},
++		{"legado mantém origem e exibição", "<vCalcDR>40.00</vCalcDR>", "<vDedRed><vDR>35.00</vDR></vDedRed>", "R$ 35,00", true},
++		{"sem deduções mantém traço", "", "", "-", false},
++	} {
++		t.Run(tc.nome, func(t *testing.T) {
++			entrada := "<NFSe><infNFSe><valores>" + tc.novosValores +
++				"</valores><DPS><infDPS><valores>" + tc.valoresDPS +
++				"</valores></infDPS></DPS></infNFSe></NFSe>"
++			var nota models.NFSe
++			if err := xml.Unmarshal([]byte(entrada), &nota); err != nil {
++				t.Fatal(err)
++			}
++			municipal := NovoServicoApresentacaoDanfse().montarTributacaoMunicipal(nota)
++			if municipal.TotalDeducoes != tc.esperado || municipal.Visivel != tc.visivel {
++				t.Fatalf("deduções/visibilidade: esperado %q/%t, obteve %q/%t", tc.esperado, tc.visivel, municipal.TotalDeducoes, municipal.Visivel)
++			}
++		})
++	}
++}

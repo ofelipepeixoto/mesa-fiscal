@@ -2,7 +2,7 @@ FROM golang:1.27.4-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e13857
 WORKDIR /src
 COPY --from=upstream / ./
 COPY deploy/danfse-go/ /overlay/
-RUN sha256sum -c /overlay/upstream.sha256 && cp /overlay/go.mod /overlay/go.sum ./ && go mod download && go mod verify
+RUN sha256sum -c /overlay/upstream.sha256 && git apply --check /overlay/nt009-issqn.patch && git apply /overlay/nt009-issqn.patch && cp /overlay/go.mod /overlay/go.sum ./ && go mod download && go mod verify
 RUN CGO_ENABLED=0 GOTOOLCHAIN=local go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" -o /out/danfse ./cmd/danfse
 
 FROM scratch

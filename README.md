@@ -64,13 +64,15 @@ Nesta revisão, as calculadoras usam Java 25 e o catálogo migrado até V0073. A
 
 Os dois projetos de origem declaram Spring Boot 4.1.2. O Mesa Fiscal aplica o patch de segurança 4.1.3 a essa dependência ao montar os JARs. A construção confere a versão de origem, executa os testes no ambiente atualizado e verifica a versão incluída em cada arquivo final. O regime regular recebe também o patch Spring Retry 2.0.13. A construção confere o POM original antes de aplicar essa atualização e exige a versão corrigida no JAR final. As duas imagens também usam a opção de proteção do Java publicada nos projetos da Receita. [Patch da distribuição](deploy/spring-parent.sh) · [Aviso de segurança do Spring](https://spring.io/security/cve-2026-59414/) · [Patch Spring Retry](deploy/spring-retry.sh) · [Aviso do Spring Retry](https://spring.io/security/cve-2026-41710/)
 
+O [ajuste do DANFSe para a NT 009](deploy/danfse-go/nt009-issqn.patch) é do Mesa Fiscal, ainda não integra a revisão de origem. Ele lê o totalizador de deduções do ISSQN da NFS-e quando presente, sem recalcular tributos nem somar fontes. Se o campo não existir, mantém o comportamento anterior. O [BUILD.txt](public/engine/BUILD.txt) identifica a revisão da Receita e o hash SHA-256 do ajuste local. Isso não implica suporte integral à NT 009 nem validação fiscal do XML.
+
 ## Atualizações da Receita
 
 A verificação diária no GitHub está programada para 07h19 no horário de Brasília. Quando encontra um commit novo, o monitor reúne as diferenças em uma única issue. Para testar uma atualização, prepare uma branch a partir dos commits indicados e abra um PR. A homologação compara os cálculos nos motores reais e testa o PDF no navegador. [Ver como atualizar os motores](docs/atualizar-motores.md)
 
 ## Como o sistema foi construído
 
-O painel usa HTML, CSS responsivo e módulos JavaScript nativos. Os exemplos educativos fazem as contas com decimais representados em inteiros e arredondamento testado. O serviço Node separa os contratos dos três projetos em adaptadores. Os dois motores Java usam os dados locais da Receita. A geração de PDF prioriza o motor Go oficial compilado em WebAssembly, carregado em uma tarefa separada do navegador. Há também o adaptador para a versão HTTP local desse gerador.
+O painel usa HTML, CSS responsivo e módulos JavaScript nativos. Os exemplos educativos fazem as contas com decimais representados em inteiros e arredondamento testado. O serviço Node separa os contratos dos três projetos em adaptadores. Os dois motores Java usam os dados locais da Receita. A geração de PDF usa o gerador Go da Receita compilado em WebAssembly e carregado em uma tarefa separada do navegador, com o ajuste local do Mesa Fiscal descrito abaixo. A versão HTTP local aplica o mesmo ajuste.
 
 A Central de ajuda inclui um assistente que identifica a intenção da pergunta por similaridade entre palavras e frases de referência em português. Ele mostra uma resposta revisada e o atalho correspondente. Perguntas sobre enquadramento e alíquotas recebem orientação para consultar a contabilidade. A pergunta fica no navegador. Não há chamada a modelos externos nem uso de IA para decidir valores de impostos.
 
@@ -83,6 +85,8 @@ npm ci --ignore-scripts
 npm test
 npm run build
 node scripts/testar-motor-wasm.mjs
+# Com pdftotext instalado:
+node scripts/testar-danfse-nt009.mjs
 ```
 
 `npm run build` gera a edição estática em `dist/`. O workflow de homologação executa as verificações com Docker e Chrome. Os scripts de construção e a pasta `public/engine/` registram a revisão do gerador, as dependências, os avisos de licença e os hashes dos arquivos distribuídos.

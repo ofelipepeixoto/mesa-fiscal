@@ -34,6 +34,9 @@ export async function checkDistribution(dir = join(root, 'public/engine')) {
   const revision = parseLock(await readFile(join(root, 'upstream.lock.env'), 'utf8')).danfse;
   const source = 'Fonte: https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse/commit/' + revision;
   assert.deepEqual(build.split('\n').filter(line => line.startsWith('Fonte:')), [source], 'Revise a origem do binário.');
+  const patch = entry(await readFile(join(root, 'deploy/danfse-go/nt009-issqn.patch')));
+  const patchPrefix = 'Overlay Mesa Fiscal NT 009 (SHA-256): ';
+  assert.deepEqual(build.split('\n').filter(line => line.startsWith(patchPrefix)), [patchPrefix + patch.sha256], 'Revise a identificação do patch local.');
   const overlay = await readFile(join(root, 'deploy/danfse-go/go.mod'), 'utf8');
   const required = new Map([...overlay.matchAll(/^\s*([^\s]+) (v\S+)/gm)].map(([, mod, version]) => [mod, version]));
   const compiled = new Map([...build.matchAll(/^(\S+) (v\S+)$/gm)].map(([, mod, version]) => [mod, version]));

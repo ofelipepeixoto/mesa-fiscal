@@ -17,6 +17,8 @@ git -C "$work/source" checkout --quiet --detach FETCH_HEAD
 test "$(git -C "$work/source" rev-parse HEAD)" = "$commit"
 cd "$work/source"
 sha256sum -c "$root/deploy/danfse-go/upstream.sha256"
+git apply --check "$root/deploy/danfse-go/nt009-issqn.patch"
+git apply "$root/deploy/danfse-go/nt009-issqn.patch"
 cp "$root/deploy/danfse-go/go.mod" "$root/deploy/danfse-go/go.sum" ./
 mkdir -p "$work/engine"
 export GOOS=js GOARCH=wasm CGO_ENABLED=0 GOTOOLCHAIN=local
@@ -39,6 +41,7 @@ done < "$work/modules" > "$work/engine/THIRD-PARTY.txt"
   go version
   go list -deps -mod=readonly -f '{{with .Module}}{{.Path}} {{.Version}}{{end}}' ./cmd/danfse-wasm | sort -u
   printf 'Fonte: https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse/commit/%s\n' "$commit"
+  printf 'Overlay Mesa Fiscal NT 009 (SHA-256): %s\n' "$(sha256sum "$root/deploy/danfse-go/nt009-issqn.patch" | cut -d' ' -f1)"
   (cd "$work" && sha256sum danfse.wasm)
 } > "$work/engine/BUILD.txt"
 (cd "$work/engine" && sha256sum BUILD.txt LICENSE-*.txt THIRD-PARTY.txt danfse.wasm.gz wasm_exec.js > SHA256SUMS && sha256sum -c SHA256SUMS)
