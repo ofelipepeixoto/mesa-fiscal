@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<NFSe xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.01">
+  <!--FICTICIO SEM VALOR FISCAL. Marcadores XMLDSig sintaticos, sem assinatura valida, nenhuma emissao.--><infNFSe Id="NFS00000000000000000000000000000000000000000000000000">
+    <xLocEmi>Rio de Janeiro</xLocEmi>
+    <xLocPrestacao>Rio de Janeiro</xLocPrestacao>
+    <nNFSe>1</nNFSe>
+    <cLocIncid>3304557</cLocIncid>
+    <xLocIncid>Rio de Janeiro</xLocIncid>
+    <xTribNac>Servico ficticio</xTribNac><verAplic>Teste local</verAplic><ambGer>2</ambGer>
+    <tpEmis>1</tpEmis><cStat>100</cStat>
+    <dhProc>2026-11-19T10:00:00-03:00</dhProc>
+    <nDFSe>1</nDFSe><emit>
+      <CNPJ>00000000000000</CNPJ>
+      <xNome>Estúdio de Exemplo Fictício</xNome>
+      <enderNac><xLgr>Rua Ficticia</xLgr><nro>1</nro><xBairro>Bairro Ficticio</xBairro><cMun>3304557</cMun><UF>RJ</UF><CEP>00000000</CEP></enderNac>
+    </emit>
+    <valores><vBC>850.00</vBC><vISSQN>17.00</vISSQN><vLiq>850.00</vLiq></valores>
+    <IBSCBS><cLocalidadeIncid>3304557</cLocalidadeIncid><valores><vBC>833.00</vBC><uf><pIBSUF>0.10</pIBSUF><pAliqEfetUF>0.10</pAliqEfetUF></uf><mun><pIBSMun>0.00</pIBSMun><pAliqEfetMun>0.00</pAliqEfetMun></mun><fed><pCBS>0.90</pCBS><pAliqEfetCBS>0.90</pAliqEfetCBS></fed></valores><totCIBS><vTotNF>850.00</vTotNF></totCIBS></IBSCBS><DPS versao="1.01">
+      <infDPS Id="DPS330455720000000000000000000000000000000000">
+        <tpAmb>2</tpAmb>
+        <dhEmi>2026-11-19T10:00:00-03:00</dhEmi>
+        <verAplic>Teste local</verAplic><serie>1</serie><nDPS>1</nDPS>
+        <dCompet>2026-11-19</dCompet>
+        <tpEmit>1</tpEmit><finNFSe>0</finNFSe><cLocEmi>3304557</cLocEmi>
+        <prest><CNPJ>00000000000000</CNPJ><regTrib><opSimpNac>1</opSimpNac><regEspTrib>0</regEspTrib></regTrib></prest>
+        <toma><CPF>00000000000</CPF><xNome>Cliente de Exemplo</xNome></toma>
+        <serv>
+          <locPrest><cLocPrestacao>3304557</cLocPrestacao></locPrest>
+          <cServ>
+            <cTribNac>010101</cTribNac>
+            <xDescServ>EXEMPLO FICTÍCIO SEM VALOR FISCAL. Serviço de tecnologia para apresentação do sistema.</xDescServ>
+          </cServ>
+          <infoCompl><xInfComp>Documento didático sem emissão, assinatura ou autorização. Todos os dados são fictícios.</xInfComp></infoCompl>
+        </serv>
+        <valores>
+          <vServPrest><vServ>850.00</vServ></vServPrest>
+          <trib><tribMun><tribISSQN>1</tribISSQN><tpRetISSQN>1</tpRetISSQN></tribMun><totTrib><indTotTrib>0</indTotTrib></totTrib></trib>
+        </valores>
+      <IBSCBS><indDest>0</indDest><valores><trib><CST>000</CST><cClassTrib>000001</cClassTrib><gIBSCBS/></trib></valores></IBSCBS></infDPS>
+    </DPS>
+  </infNFSe>
+<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/><SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/></Transforms><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>AA==</DigestValue></Reference></SignedInfo><SignatureValue>AA==</SignatureValue><KeyInfo><X509Data><X509Certificate>AA==</X509Certificate></X509Data></KeyInfo></Signature></NFSe>

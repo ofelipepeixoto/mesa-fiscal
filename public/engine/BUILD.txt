@@ -32,4 +32,5 @@ golang.org/x/tools v0.51.0
 gopkg.in/yaml.v3 v3.0.1
 sigs.k8s.io/yaml v1.4.0
 Fonte: https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse/commit/8d79e6b2f7fad6375340afcb51c85ed370c64a14
-d585c867478ce8110be6db981e3ea8bb70ebe87e1ba0815e3edc9559e765f5e5  danfse.wasm
+Overlay Mesa Fiscal NT 009 (SHA-256): 3d8fcfc5720e8c1d609d3913570efc7b53f0b71cc2f9d4154e22ec10c38b3eff
+50a5d91bcc8f027823a1716f406b5cd35fc4a7d9b57c43b2e10c963b8d976b63  danfse.wasm
