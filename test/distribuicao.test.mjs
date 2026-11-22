@@ -29,9 +29,17 @@ test('o site distribui só os arquivos previstos e verifica o código recebido',
     assert.ok(!data.toString().includes('sourceMappingURL='));
   }
   assert.deepEqual((await readdir(outputDir)).sort(), [
+    'document-validators-LICENSE.txt',
     '_headers', 'danfse-worker.js', 'engine', 'exemplo-danfse.pdf', 'exemplo-nfse.xml',
     'index.html', 'marca.svg', ...links.map(link => link[1]),
   ].sort());
+  const validatorsLicense = await readFile(join(outputDir, 'document-validators-LICENSE.txt'), 'utf8');
+  assert.match(validatorsLicense, /Copyright \(c\) 2026 Carlos Felipe/);
+  assert.match(validatorsLicense, /Copyright \(c\) 2026 Nikolas DeHor/);
+  assert.match(validatorsLicense, /Permission is hereby granted/);
+  const javascript = await readFile(join(outputDir, links.find(link => link[1].endsWith('.js'))[1]), 'utf8');
+  assert.match(javascript, /document-validators-LICENSE\.txt/);
+  assert.match(javascript, /Nikolas DeHor/);
   assert.deepEqual((await readdir(join(outputDir, 'engine'))).sort(), [
     'BUILD.txt', 'LICENSE-DANFSe.txt', 'LICENSE-Go.txt', 'SHA256SUMS', 'THIRD-PARTY.txt',
     'danfse.wasm.gz', 'wasm_exec.js',

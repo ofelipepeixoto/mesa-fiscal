@@ -25,6 +25,7 @@ on:
       - 'scripts/verificar-logs-ci.mjs'
       - 'test/**'
       - 'scripts/testar-danfse-navegador.mjs'
+      - 'scripts/testar-documentos-navegador.mjs'
       - 'scripts/compilar-danfse.sh'
       - 'scripts/verificar-distribuicao-danfse.mjs'
 
