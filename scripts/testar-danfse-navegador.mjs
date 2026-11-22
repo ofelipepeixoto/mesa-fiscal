@@ -137,6 +137,8 @@ try {
     await command(session + '/element', {using: 'css selector', value: '.flow-result'});
     await command(session + '/url', {url: 'http://127.0.0.1:' + app.address().port + '/#historico'});
     await checkScreen('#historico', 'Histórico da sessão');
+    await command(session + '/refresh', {});
+    await checkScreen('#historico', 'Histórico da sessão');
     assert.equal(await command(session + '/execute/sync', {args: [],
       script: "return document.querySelectorAll('.history-row').length"}), 0, 'Recarregar deve apagar o histórico.');
   }
