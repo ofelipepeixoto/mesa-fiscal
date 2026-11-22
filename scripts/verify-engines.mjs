@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { regularExample, projectEducation } from '../public/regular-study.mjs';
 import { simplesExample, estimateSimples } from '../public/simples-study.mjs';
+import { calculationVersions } from '../public/calculation-versions.mjs';
 
 const origin = 'http://127.0.0.1:4173';
 const engines = ['regular', 'simples', 'danfse'];
@@ -40,6 +41,8 @@ async function verifyAmounts(path, input, amounts, status) {
   const response = await submit(path, JSON.stringify(input), 'application/json');
   assert.match(response.headers.get('content-type') || '', /application\/json/);
   const actual = await response.json();
+  assert.deepEqual(actual.calculationVersion, calculationVersions.engine[path.slice('/api/'.length)],
+    path + ' deve devolver as revisões previstas da distribuição.');
   assert.equal(actual.status, status, path + ' deve informar o estado devolvido pelo motor.');
   for (const [field, amount] of Object.entries(amounts)) {
     assert.equal(actual[field], amount, path + ' devolveu um valor inesperado para ' + field);

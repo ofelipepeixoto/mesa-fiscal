@@ -863,6 +863,24 @@ h3 {
   border-top:1px solid var(--line);
 }
 
+.history-version {
+  margin-top:6px;
+  font-size:.875rem;
+  overflow-wrap:anywhere;
+}
+
+.history-version p {
+  margin:6px 0;
+}
+
+.history-version summary {
+  cursor:pointer;
+}
+
+.history-row>div {
+  min-width:0;
+}
+
 .history-row small {
   display:block;
   color:var(--muted);

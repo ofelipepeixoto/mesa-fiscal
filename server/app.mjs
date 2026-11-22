@@ -8,6 +8,7 @@ import { calculateRegular, serviceAddress as regularAddress } from './regular.mj
 import { calculateSimples, listSimplesActivities, serviceUrl as simplesAddress, SIMPLES_PATH } from './simples.mjs';
 import { generateDanfse, serviceAddress as danfseAddress, MAX_XML_BYTES } from './danfse.mjs';
 import { readLocalJson } from './local-json.mjs';
+import { calculationVersions } from '../public/calculation-versions.mjs';
 
 const defaultStaticRoot = new URL('../public/', import.meta.url);
 // Dois PDFs simultâneos podem ocupar 64 MiB só nas respostas, além do XML e do motor.
@@ -154,7 +155,8 @@ export function createMesaServer({
           const result = url.pathname === '/api/regular'
             ? await calculateRegular(data, { baseUrl: regularUrl, fetchImpl })
             : await calculateSimples(data, { baseUrl: simplesUrl, fetchImpl });
-          return json(res, 200, result);
+          const kind = url.pathname === '/api/regular' ? 'regular' : 'simples';
+          return json(res, 200, { ...result, calculationVersion: calculationVersions.engine[kind] });
         }
         if (req.method === 'POST' && url.pathname === '/api/danfse') {
           checkType(req, ['application/xml', 'text/xml']);

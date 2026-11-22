@@ -13,6 +13,7 @@ on:
       - 'compose.yaml'
       - 'upstream.lock.env'
       - 'scripts/upstreams.mjs'
+      - 'scripts/calculation-versions.mjs'
       - 'package*.json'
       - 'scripts/build.mjs'
       - 'public/**'
@@ -52,6 +53,7 @@ jobs:
           npm ci --ignore-scripts --no-fund --no-audit
           npm audit --include=dev --audit-level=high --registry=https://registry.npmjs.org
           node scripts/upstreams.mjs verify
+          node scripts/calculation-versions.mjs verify
           (cd public/engine && sha256sum -c SHA256SUMS)
           node --test test/*.test.mjs
           node scripts/build.mjs

@@ -1,6 +1,7 @@
 import { icon, fillIcons } from './icons.mjs';
 import { renderFlow } from './flows.mjs';
 import { mountAssistant } from './assistente.mjs';
+import { createHistoryEntry, describeCalculationVersion } from './history.mjs';
 
 const tools = {
   regular: {
@@ -52,7 +53,7 @@ const questions = [
   ],
   [
     'Meu XML e minhas simulações ficam salvos?',
-    'O histórico desta aba guarda a ferramenta, a hora, o total da simulação e a origem do resultado. Você pode limpá-lo pelo próprio histórico. Para um PDF, registra apenas a geração. O XML é processado no navegador ou, na instalação local, pelo gerador indicado antes do envio. Você pode remover o arquivo selecionado na tela do PDF. Os arquivos baixados ficam na pasta que você escolher.',
+    'O histórico desta aba guarda a ferramenta, a hora, o total da simulação, a origem e a identificação da versão disponível para o cálculo. A revisão prevista de um motor não confirma a versão em execução. Você pode limpar o histórico; ele também é apagado ao recarregar. Para um PDF, registra apenas a geração. O XML é processado no navegador ou, na instalação local, pelo gerador indicado antes do envio. Você pode remover o arquivo selecionado na tela do PDF. Os arquivos baixados ficam na pasta que você escolher.',
   ],
 ];
 
@@ -176,6 +177,22 @@ function historyRow(operation) {
   detail.textContent = `${operation.time} · ${operation.detail}`;
   amount.textContent = operation.value;
   description.append(title, detail);
+  if (operation.kind !== 'danfse') {
+    const version = describeCalculationVersion(operation.calculationVersion, operation.kind);
+    const details = document.createElement(version.lines.length ? 'details' : 'small');
+    details.className = 'history-version';
+    if (version.lines.length) {
+      const summary = document.createElement('summary');
+      summary.textContent = version.summary;
+      details.append(summary);
+      for (const line of version.lines) {
+        const paragraph = document.createElement('p');
+        paragraph.textContent = line;
+        details.append(paragraph);
+      }
+    } else details.textContent = version.summary;
+    description.append(details);
+  }
   row.append(description, amount);
   return row;
 }
@@ -212,16 +229,10 @@ function historyView() {
   host.append(panel);
 }
 
-function onComplete({ kind, title, value, detail }) {
-  if (!Object.hasOwn(tools, kind)) return;
-  const time = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date());
-  history.unshift({
-    kind,
-    title: String(title),
-    value: String(value),
-    detail: String(detail || ''),
-    time,
-  });
+function onComplete(operation) {
+  const entry = createHistoryEntry(operation);
+  if (!entry) return;
+  history.unshift(entry);
   if (history.length > 60) history.pop();
 }
 
