@@ -13,7 +13,7 @@ github.com/go-openapi/swag/pools v0.29.2
 github.com/go-openapi/swag/stringutils v0.29.2
 github.com/go-openapi/swag/typeutils v0.29.2
 github.com/go-openapi/swag/yamlutils v0.29.2
-github.com/labstack/echo/v5 v5.4.6
+github.com/labstack/echo/v5 v5.4.7
 github.com/sv-tools/openapi v0.4.0
 github.com/swaggo/echo-swagger/v2 v2.0.1
 github.com/swaggo/files/v2 v2.0.2
@@ -32,4 +32,4 @@ golang.org/x/tools v0.51.0
 gopkg.in/yaml.v3 v3.0.1
 sigs.k8s.io/yaml v1.4.0
 Fonte: https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse/commit/8d79e6b2f7fad6375340afcb51c85ed370c64a14
-d585c867478ce8110be6db981e3ea8bb70ebe87e1ba0815e3edc9559e765f5e5  danfse.wasm
+fa4e2966b7f400f3f16236b1144c1d4e5a71be9e1b4fa42e39f0c30017ca8f78  danfse.wasm
