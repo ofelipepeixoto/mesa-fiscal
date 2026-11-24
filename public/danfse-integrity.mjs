@@ -11,11 +11,11 @@ export const engine = {
     "sha256": "819ab7a1ff60cc4eaca8fe388acce4ec1e20f0205a8bbe5d808918d37551bd36"
   },
   "gzip": {
-    "size": 8115447,
-    "sha256": "ac4415cca7e4a2612b624ed8d9eaa368c17919e80fa3c033bdf69fc1a0529e5d"
+    "size": 8117122,
+    "sha256": "643a17dfe58fbe8b99e1c2de9739ef2d53b4291d8c7c029299fb5d287d2b0227"
   },
   "wasm": {
-    "size": 31774546,
-    "sha256": "d585c867478ce8110be6db981e3ea8bb70ebe87e1ba0815e3edc9559e765f5e5"
+    "size": 31777010,
+    "sha256": "d0b90b3e1b2c89850478cf4efd60ca49472cca5a3b56f7ad3965be6dc1797a81"
   }
 };
