@@ -21,8 +21,8 @@ export const calculationVersions = {
       "kind": "regular",
       "mode": "engine",
       "codeRevision": "78c15dbb20ff21bbd4dfb04b5e684f0b67628481ddfdd5a81f00bee361a6429f",
-      "expectedEngineRevision": "f1eebd7ce3157423b1a6aaca7dc1d6c3395452c4",
-      "expectedCatalogRevision": "f1eebd7ce3157423b1a6aaca7dc1d6c3395452c4"
+      "expectedEngineRevision": "def97056b799da8dd1306f4c9e47c669f4d44b4e",
+      "expectedCatalogRevision": "def97056b799da8dd1306f4c9e47c669f4d44b4e"
     },
     "simples": {
       "schema": 1,
@@ -30,7 +30,7 @@ export const calculationVersions = {
       "mode": "engine",
       "codeRevision": "3891b06e04ae5f94873e21dfd29644666076fa864b381284a08a1499a8cbf6fd",
       "expectedEngineRevision": "a926d5a76095ac0295a6612a9a54db7ffead2396",
-      "expectedCatalogRevision": "f1eebd7ce3157423b1a6aaca7dc1d6c3395452c4"
+      "expectedCatalogRevision": "def97056b799da8dd1306f4c9e47c669f4d44b4e"
     }
   }
 };

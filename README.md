@@ -55,7 +55,7 @@ O manifesto versionado reúne os três commits utilizados na construção. A int
 <!-- upstream-pins:start -->
 | Projeto original | Revisão utilizada | Fork |
 | --- | --- | --- |
-| [Regime regular](https://github.com/ReceitaFederal/calculadora-rtc-regime-regular) | [f1eebd7c](https://github.com/ReceitaFederal/calculadora-rtc-regime-regular/commit/f1eebd7ce3157423b1a6aaca7dc1d6c3395452c4) | [Fork do regime regular](https://github.com/ofelipepeixoto/calculadora-rtc-regime-regular) |
+| [Regime regular](https://github.com/ReceitaFederal/calculadora-rtc-regime-regular) | [def97056](https://github.com/ReceitaFederal/calculadora-rtc-regime-regular/commit/def97056b799da8dd1306f4c9e47c669f4d44b4e) | [Fork do regime regular](https://github.com/ofelipepeixoto/calculadora-rtc-regime-regular) |
 | [Simples Nacional](https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional) | [a926d5a7](https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional/commit/a926d5a76095ac0295a6612a9a54db7ffead2396) | [Fork do Simples Nacional](https://github.com/ofelipepeixoto/calculadora-rtc-simples-nacional) |
 | [Gerador de DANFSe](https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse) | [8d79e6b2](https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse/commit/8d79e6b2f7fad6375340afcb51c85ed370c64a14) | [Fork do gerador de DANFSe](https://github.com/ofelipepeixoto/calculadora-rtc-gerador-danfse) |
 <!-- upstream-pins:end -->
