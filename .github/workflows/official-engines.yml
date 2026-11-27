@@ -22,6 +22,7 @@ on:
       - 'server/**'
       - 'server.mjs'
       - 'scripts/verify-engines.mjs'
+      - 'scripts/verificar-catalogo.py'
       - 'scripts/verificar-logs-ci.mjs'
       - 'test/**'
       - 'scripts/testar-danfse-navegador.mjs'
@@ -90,6 +91,8 @@ jobs:
         run: docker compose up -d --build
       - name: Conferir resultados pela interface HTTP
         run: node scripts/verify-engines.mjs
+      - name: Conferir a transição de vigência nos dois catálogos
+        run: python3 scripts/verificar-catalogo.py
       - name: Conferir a privacidade do XML nos registros locais
         id: privacidade
         run: node scripts/verificar-logs-ci.mjs
