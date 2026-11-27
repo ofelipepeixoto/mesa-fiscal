@@ -18,6 +18,8 @@ Quando há mudanças, a rotina compila os alvos HTTP e WebAssembly, regenera a d
 
 O arquivo `upstream.lock.env` contém apenas três identificadores públicos de commit. A fonte de cada projeto está definida em `scripts/upstreams.mjs`. O Compose preserva os endereços de build completos para continuar aceitando `docker compose up --build` diretamente. A homologação recusa um Compose desatualizado ou um WASM com origem incompatível com o manifesto.
 
+Com a pilha local de homologação em execução, `python3 scripts/verificar-catalogo.py` copia temporariamente os catálogos construídos para leitura, confere o registro V0074 e a igualdade das duas tabelas afetadas nos motores. A verificação cobre 30/11, 01/12, 06/12 e 07/12/2026 para as vigências alteradas pela revisão oficial 1.7.3. Uma revisão futura que mudar essas datas exige atualizar essa expectativa após conferir a mudança oficial. O teste não altera os bancos dos contêineres e não usa XML ou dados de clientes.
+
 ## O que revisar quando a versão muda
 
 | Mudança observada | Como ela aparece | O que fazer no PR |

@@ -25,7 +25,7 @@ services:
       context: .
       dockerfile: deploy/regular.Dockerfile
       additional_contexts:
-        upstream: https://github.com/ReceitaFederal/calculadora-rtc-regime-regular.git#def97056b799da8dd1306f4c9e47c669f4d44b4e
+        upstream: https://github.com/ReceitaFederal/calculadora-rtc-regime-regular.git#0d4b073da96db8d015e50736d1552bbc7623224e
     # O driver SQLite carrega sua biblioteca nativa em /tmp.
     tmpfs: ["/tmp:rw,nosuid,nodev,exec,mode=1777,size=128m"]
     networks: [motores]
@@ -36,7 +36,7 @@ services:
       dockerfile: deploy/simples.Dockerfile
       additional_contexts:
         upstream: https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional.git#a926d5a76095ac0295a6612a9a54db7ffead2396
-        catalog: https://github.com/ReceitaFederal/calculadora-rtc-regime-regular.git#def97056b799da8dd1306f4c9e47c669f4d44b4e
+        catalog: https://github.com/ReceitaFederal/calculadora-rtc-regime-regular.git#0d4b073da96db8d015e50736d1552bbc7623224e
     # O driver SQLite carrega sua biblioteca nativa em /tmp.
     tmpfs: ["/tmp:rw,nosuid,nodev,exec,mode=1777,size=128m"]
     networks: [motores]
