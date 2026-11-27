@@ -47,7 +47,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Obter a revisão em teste
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
       - name: Verificar contratos e versão estática
@@ -77,7 +77,7 @@ jobs:
         if: needs.danfse.result != 'success'
         run: exit 1
       - name: Obter a revisão em teste
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
       - name: Preparar o construtor
