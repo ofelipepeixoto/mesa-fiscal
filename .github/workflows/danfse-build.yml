@@ -67,7 +67,7 @@ jobs:
             jq -s --arg target "$target" '[.[] | select(.finding.trace[0].function? != null) | .finding.osv] | unique | {alvo:$target,avisos:.}' "$RUNNER_TEMP/avisos-$target.json"
           done
       - name: Salvar resultados da análise de dependências
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: analise-go
           path: ${{ runner.temp }}/avisos-*.json
@@ -85,7 +85,7 @@ jobs:
         id: artefato
         run: echo "motor_sha256=$(sha256sum public/engine/danfse.wasm.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - name: Disponibilizar o motor
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: motor-danfse-browser
           path: public/engine/
